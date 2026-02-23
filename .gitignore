@@ -21,3 +21,5 @@ node_modules
 
 # cli
 dist
+packages/backend/clawdviction.db*
+packages/nextjs/.env.local
