@@ -1,6 +1,6 @@
 # 🦀 ClawdViction
 
-> AI-powered conviction governance for $CLAWD holders. Stake tokens, train your personal AI larva, and let it govern on your behalf.
+> AI-powered conviction governance for $CLAWD holders. Stake tokens, train your personal AI larva, and let it represent you in governance.
 
 Inspired by [Vitalik Buterin's vision](https://x.com/vitalikbuterin/status/2025225247088402581) of personal AI agents for democratic participation.
 
@@ -16,26 +16,26 @@ DAOs fail because nobody has the attention bandwidth. There are too many decisio
 
 ## How It Works
 
-1. **Stake $CLAWD** — lock tokens into the staking contract
-2. **Get a Larva** — your persistent personal AI agent, gated by your stake
-3. **Train it** — through conversation, your larva learns your values, preferences, and worldview
-4. **Earn ClawdViction** — governance weight that grows continuously: `amount × seconds staked`
-5. **Govern** — your larva debates and votes on your behalf, informed by everything you've taught it
+1. **Stake $CLAWD** — lock tokens into the staking contract on Base
+2. **Onboard** — answer 10 questions about your values, philosophy, and governance preferences
+3. **Get a Larva** — your persistent personal AI agent, seeded with your identity brief
+4. **Train it** — through conversation, your larva learns your worldview
+5. **Earn ClawdViction** — governance weight that grows continuously: `amount × seconds staked`
+6. **Govern** — your larva debates and votes on your behalf
 
-This isn't just token voting. It's **AI-mediated deliberation** — larvae actually discuss tradeoffs, surface objections, and find consensus, informed by the diverse preferences of the entire holder base.
+This isn't just token voting. It's **AI-mediated deliberation** — larvae discuss tradeoffs, surface objections, and find consensus across the holder base.
 
 ---
 
 ## Conviction Mechanics
 
 ```
-conviction = amount_staked × seconds_staked
+clawdviction = amount_staked × seconds_staked
 ```
 
-- Multiple stake positions supported — each earns conviction independently
+- Multiple stake positions — each earns clawdviction independently
 - No lockups — unstake anytime, tokens returned in full
-- Conviction resets when you unstake (patience is rewarded naturally)
-- `getConviction(address)` sums all active positions
+- Clawdviction resets when you unstake (patience is rewarded)
 
 ---
 
@@ -44,10 +44,66 @@ conviction = amount_staked × seconds_staked
 | Page | Description |
 |------|-------------|
 | `/` | Hero + explainer — connect wallet to get started |
-| `/stake` | Stake $CLAWD, view conviction score, manage positions, faucet for testing |
-| `/chat` | Wallet-gated AI larva — requires an active stake to access |
+| `/stake` | Stake $CLAWD, view clawdviction score, manage positions |
+| `/onboard` | 10-question interview — trains your larva with your values and preferences |
+| `/chat` | Wallet-gated AI larva — requires active stake to access |
 | `/about` | Full vision + how it works |
-| `/debug` | SE-2 contract debugger |
+
+---
+
+## Live Demo
+
+Deployed on Vercel. Connect your wallet, stake some $CLAWD on Base, go through the onboarding interview, then chat with your larva. It knows who you are before you say a word.
+
+**Contract:** `ClawdVictionStaking` @ `0xAF206d40F293f5892ce86986BaFF5BB426a188a1` (Base mainnet)  
+**$CLAWD token:** `0x9f86dB9fc6f7c9408e8Fda3Ff8ce4e78ac7a6b07` (Base mainnet)
+
+---
+
+## Architecture
+
+```
+┌────────────────────────────────┐
+│  Vercel (Next.js)              │
+│                                │
+│  /              landing        │
+│  /onboard       interview      │
+│  /stake         stake CLAWD    │
+│  /chat          talk to larva  │
+│                                │
+│  API Routes (serverless):      │
+│  /api/chat          larva AI   │
+│  /api/clawdviction  on-chain   │
+│  /api/onboard       interview  │
+│  /api/larva/status  stub       │
+└────────────────┬───────────────┘
+                 │
+       ┌─────────┴──────────┐
+       ▼                    ▼
+┌────────────────┐  ┌──────────────────┐
+│ Anthropic API  │  │  Base Mainnet    │
+│ Haiku (chat)   │  │ ClawdViction     │
+│ Haiku (onboard)│  │ contract reads   │
+└────────────────┘  └──────────────────┘
+```
+
+No Docker. No persistent server. Every larva interaction is a serverless API call.
+
+---
+
+## Onboarding Interview
+
+New wallets go through a 10-question interview before accessing chat. Topics:
+
+- Who are you and what brought you to $CLAWD?
+- What structural upside do you want from holding?
+- Burn vs return split preferences
+- What to build (casino games, AI agents, fantasy crypto, etc.)
+- Risk tolerance (1–5 scale)
+- Hard lines — what you'd always vote NO on
+- Magic wand — what you'd change with no constraints
+
+On submit, Haiku synthesizes the answers into a compact **identity brief** (~200 tokens). The brief is stored in `localStorage` and injected into every chat system prompt — so the larva knows your values from message #1.
 
 ---
 
@@ -55,41 +111,30 @@ conviction = amount_staked × seconds_staked
 
 ### `ClawdVictionStaking.sol`
 
-The core staking contract. Tracks conviction per address across multiple stake positions.
-
 ```solidity
 function stake(uint256 amount) external
 function unstake(uint256 stakeIndex) external
-function getConviction(address user) public view returns (uint256)
-function getStakeConviction(address user, uint256 stakeIndex) public view returns (uint256)
-function getActiveStakes(address user) external view returns (uint256[] amounts, uint256[] stakedAts)
+function getClawdviction(address user) public view returns (uint256)
 function getStakeCount(address user) external view returns (uint256)
+function getActiveStakes(address user) external view returns (uint256[] amounts, uint256[] stakedAts)
 ```
 
 **Events:**
 - `Staked(address indexed user, uint256 amount, uint256 stakeIndex)`
 - `Unstaked(address indexed user, uint256 amount, uint256 stakeIndex, uint256 conviction)`
 
-### `MockCLAWD.sol`
-
-Test ERC-20 for local dev. 1B initial supply, public `faucet(address, amount)` for easy testing.
-
-> For production, point to the real $CLAWD token on Base: `0x...` *(update when deployed)*
-
 ---
 
-## Quickstart
+## Quickstart (local dev)
 
 ### Requirements
 
 - Node >= v20.18.3
-- Yarn v1 or v2+
-- Git
+- Yarn v2+
 
 ### Run locally
 
 ```bash
-# Install dependencies
 yarn install
 
 # Terminal 1 — local chain
@@ -98,38 +143,54 @@ yarn chain
 # Terminal 2 — deploy contracts
 yarn deploy
 
-# Terminal 3 — frontend
+# Terminal 3 — backend (SQLite + Express for local persistence)
+yarn backend
+
+# Terminal 4 — frontend
 yarn start
 ```
 
 Visit `http://localhost:3000`
 
-Use the faucet on `/stake` to get test $CLAWD, then stake and head to `/chat` to meet your larva.
+Use the faucet on `/stake` to get test $CLAWD, stake, go through `/onboard`, then head to `/chat`.
 
-### Chat / AI Larva
-
-The `/chat` page calls `/api/chat` which requires an Anthropic API key:
+### Environment
 
 ```bash
 cp packages/nextjs/.env.example packages/nextjs/.env.local
-# add ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-### Deploy to Base
+Required:
+```
+ANTHROPIC_API_KEY=sk-ant-...
+NEXT_PUBLIC_BACKEND_URL=http://localhost:3001
+```
+
+---
+
+## Deploy to Vercel
 
 ```bash
-yarn deploy --network base
+# From packages/nextjs/
 yarn vercel:yolo --prod
 ```
+
+Or connect the repo in the Vercel dashboard:
+1. Set **Root Directory** → `packages/nextjs`
+2. Add env var: `ANTHROPIC_API_KEY`
+3. Deploy
+
+No `NEXT_PUBLIC_BACKEND_URL` needed in production — the frontend falls back to Next.js API routes automatically.
 
 ---
 
 ## Stack
 
-- **Scaffold-ETH 2** — SE-2 scaffold with Hardhat + Next.js App Router
-- **Solidity ^0.8.20** — OpenZeppelin SafeERC20, Ownable
-- **Next.js + TypeScript** — App Router, RainbowKit, Wagmi, Viem
-- **DaisyUI + Tailwind** — component styling
+- **Scaffold-ETH 2** — Hardhat + Next.js App Router
+- **Solidity ^0.8.20** — OpenZeppelin SafeERC20
+- **Next.js 14 + TypeScript** — App Router, RainbowKit, Wagmi, Viem
+- **DaisyUI + Tailwind** — styling
+- **Anthropic Haiku** — larva AI (chat + onboarding)
 - **Target chain:** Base (chainId 8453)
 
 ---
@@ -140,10 +201,10 @@ yarn vercel:yolo --prod
 
 | Project | Description |
 |---------|-------------|
-| [clawd-fomo3d-v2](https://github.com/clawdbotatg/clawd-fomo3d-v2) | Last-bidder-wins game, 38+ rounds |
+| [clawd-fomo3d-v2](https://github.com/clawdbotatg/clawd-fomo3d-v2) | Last-bidder-wins game |
 | [clawd-1024x](https://github.com/clawdbotatg/clawd-1024x) | 1024x betting game — [1024x.fun](https://1024x.fun) |
 | [clawd-incinerator](https://github.com/clawdbotatg/clawd-incinerator) | Burns 10M $CLAWD every 8 hours |
-| [clawd-6551](https://github.com/clawdbotatg/clawd-6551) | ERC-6551 characters that earn XP across all CLAWD apps |
+| [clawd-6551](https://github.com/clawdbotatg/clawd-6551) | ERC-6551 characters that earn XP across CLAWD apps |
 | [nerve-cord](https://github.com/clawdbotatg/nerve-cord) | Encrypted inter-bot messaging backbone |
 
 ---
