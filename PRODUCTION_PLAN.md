@@ -2,11 +2,56 @@
 
 ## TL;DR
 
-- **Frontend:** Vercel (already set up)
-- **Backend:** Fly.io single machine with SQLite (not serverless — needs persistent disk)
-- **AI:** Claude Haiku for chat, memory compression to keep costs sane
-- **Cost target:** ~$60–170/month at 100 active users
-- **Key unlock:** structured onboarding interview that seeds each larva's memory
+- **Everything on Vercel.** Frontend + API routes + Postgres database.
+- No separate backend server. No Fly.io. No AWS.
+- **Vercel Pro plan (~$20/mo)** includes Postgres (Neon) — replaces SQLite entirely.
+- AI cost target: **~$60–170/month** at 100 active users with memory compression.
+
+---
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────┐
+│  Vercel (Next.js)                            │
+│                                              │
+│  Pages:                                      │
+│    /           → landing                    │
+│    /onboard    → interview flow (NEW)        │
+│    /stake      → stake $CLAWD                │
+│    /chat       → talk to your larva          │
+│                                              │
+│  API Routes:                                 │
+│    /api/chat           → larva AI            │
+│    /api/chat/history   → load messages       │
+│    /api/clawdviction   → on-chain read       │
+│    /api/larva/status   → always running      │
+│    /api/onboard        → save interview      │
+│    /api/compress       → memory compression  │
+│                                              │
+│  Database: Vercel Postgres (Neon)            │
+│    - chat_messages                           │
+│    - memory_snapshots                        │
+│    - larva_seeds (interview answers)         │
+└──────────────────┬───────────────────────────┘
+                   │
+         ┌─────────┴─────────┐
+         ▼                   ▼
+┌─────────────────┐  ┌──────────────────┐
+│  Anthropic API  │  │  Base Mainnet    │
+│  Haiku (chat)   │  │  getClawdviction │
+│  Haiku (compress│  │  (direct read)   │
+└─────────────────┘  └──────────────────┘
+```
+
+### Why this works
+
+The Express backend (`packages/backend/`) only existed because SQLite needs a
+persistent disk. Vercel Postgres gives us persistence without a server.
+
+Every backend endpoint becomes a Next.js API route. The event indexer goes away
+too — clawdviction score is read directly from the Base contract on each request
+(already how `/api/clawdviction/[wallet]/route.ts` works).
 
 ---
 
@@ -22,350 +67,251 @@ history to Claude gets expensive fast:
 | 100 users, 20 msgs/day, ~80 msg history (no compression) | 2,000 | **$840** |
 | 100 users, 20 msgs/day, compressed to ~2K tokens | 2,000 | **$168** |
 
-**The fix is memory compression.** Instead of sending 80 raw messages on every
-request, periodically summarize the conversation into a compact memory snapshot
-(~500 tokens), then send: `[snapshot] + [last 10 messages]`.
-
-Compression run itself costs ~$0.002 per user per batch. Pays for itself in 2 messages.
+**Memory compression is the key lever.** Instead of sending 80 raw messages on
+every request, periodically summarize the conversation into a compact memory
+snapshot (~500 tokens), then send: `[identity brief] + [snapshot] + [last 10 messages]`.
 
 ---
 
-## Architecture
+## Monthly Cost (100 active users)
 
+| Item | Cost |
+|------|------|
+| Vercel Pro (includes Postgres + cron + bandwidth) | $20 |
+| Anthropic Haiku (with compression) | $60–170 |
+| Alchemy RPC — Base reads (free tier) | $0 |
+| **Total** | **$80–190/month** |
+
+~$1–2 per user per month.
+
+---
+
+## Database: Vercel Postgres
+
+Replace SQLite with Vercel Postgres. Schema:
+
+```sql
+-- Chat history
+CREATE TABLE chat_messages (
+  id SERIAL PRIMARY KEY,
+  wallet TEXT NOT NULL,
+  role TEXT NOT NULL,           -- 'user' | 'assistant'
+  content TEXT NOT NULL,
+  compressed BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_chat_wallet ON chat_messages(wallet, created_at);
+
+-- Memory snapshots (compressed conversation summaries)
+CREATE TABLE memory_snapshots (
+  wallet TEXT PRIMARY KEY,
+  snapshot TEXT NOT NULL,
+  message_count INTEGER,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Onboarding interview answers + generated identity brief
+CREATE TABLE larva_seeds (
+  wallet TEXT PRIMARY KEY,
+  answers JSONB NOT NULL,        -- [{question, answer}, ...]
+  identity_brief TEXT,           -- AI-generated compact summary
+  completed BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 ```
-┌─────────────────────────────────┐
-│  Vercel (Next.js)               │
-│  - Frontend UI                  │
-│  - /api/chat (stateless fallback│
-│    with messages[] from client) │
-└────────────┬────────────────────┘
-             │ NEXT_PUBLIC_BACKEND_URL
-             ▼
-┌─────────────────────────────────┐
-│  Fly.io (Express + SQLite)      │
-│  - Persistent disk for SQLite   │
-│  - /api/chat (with DB history)  │
-│  - /api/chat/history/:wallet    │
-│  - /api/clawdviction/:wallet    │
-│  - /api/larva/:wallet/status    │
-│  - /api/onboard (interview)     │
-│  - Memory compression job       │
-└────────────┬────────────────────┘
-             │
-             ▼
-┌─────────────────────────────────┐
-│  Anthropic API                  │
-│  Haiku: chat + compression      │
-│  Sonnet (future): deliberation  │
-└─────────────────────────────────┘
-             │
-             ▼
-┌─────────────────────────────────┐
-│  Base Mainnet (on-chain reads)  │
-│  - ClawdVictionStaking.sol      │
-│  - Real $CLAWD token            │
-└─────────────────────────────────┘
+
+### Connecting
+
+```typescript
+// packages/nextjs/lib/db.ts
+import { sql } from '@vercel/postgres';
+export { sql };
+
+// Usage in any API route:
+const { rows } = await sql`
+  SELECT role, content FROM chat_messages
+  WHERE wallet = ${wallet}
+  ORDER BY created_at ASC
+  LIMIT 100
+`;
 ```
-
-### Why Fly.io, not AWS
-
-- SQLite needs a persistent disk — serverless/Lambda won't work
-- Fly.io: one `fly.toml`, persistent volume, auto-restart, ~$5–10/month for the machine
-- AWS EC2 works too but more setup (t3.micro ~$8/month + EBS volume)
-- Fly.io is simpler and costs the same. Use it.
-
-### Why keep SQLite (not Postgres)
-
-- 100 users with ~100K messages = under 50MB. SQLite handles this trivially.
-- Zero operational overhead. No connection pooling.
-- Single file = easy backups (`fly sftp get /data/clawdviction.db`)
-- Migrate to Postgres if/when you hit 10K+ users.
 
 ---
 
 ## Onboarding Interview (The Important Part)
 
-Right now larvae start cold — they know nothing about the user until they chat.
-The interview fixes this. It's a structured first-run flow that:
+Right now larvae start cold. The interview fixes this — a structured first-run
+flow that seeds each larva's memory before the first conversation.
 
-1. Asks 5–7 targeted questions on first wallet connect
-2. Stores answers as `larva_seeds` in the DB
-3. Compresses them into a permanent "identity brief" injected into every
-   conversation as a system prompt preamble
+### Flow
 
-### Interview Questions (draft)
+1. New wallet connects → redirect to `/onboard`
+2. Five questions, one at a time (no wall of forms)
+3. On submit → `POST /api/onboard` → saves answers → generates identity brief
+4. Brief stored in `larva_seeds.identity_brief`
+5. Redirect to `/chat` — larva already knows who you are
+
+### Interview Questions (v1)
 
 ```
-1. What's your name? (optional — some people prefer pseudonymous)
-2. What drew you to $CLAWD / this ecosystem?
+1. What should we call you? (name/handle — optional)
+2. What drew you to $CLAWD?
 3. What's the most important thing this community should stand for?
-4. What kinds of proposals would you automatically say YES to?
-5. What would make you automatically say NO?
-6. How much risk are you comfortable with? (conservative / balanced / high-conviction)
-7. Anything else you want your larva to know about you?
+4. What kinds of proposals would you automatically support?
+5. What would make you automatically oppose something?
+6. How much risk are you comfortable with?
+   → [Conservative] [Balanced] [High-conviction]
+7. Anything else your larva should know about you?
 ```
 
-### What Gets Generated
+### Identity Brief Generation
 
-After the interview, run one Anthropic call (Haiku, ~$0.001) to produce:
+After interview, one Haiku call (~$0.001) produces:
 
 ```
 Identity Brief for 0x11ce...:
-- Name: Austin
-- Philosophy: Decentralization above all. Skeptical of anything that concentrates power.
-- Auto YES: Open source tooling, public goods, infrastructure that benefits builders
-- Auto NO: KYC requirements, governance capture by whales, opaque treasuries
-- Risk tolerance: High-conviction. Willing to back ambitious experiments.
-- Context: Builder. Has been in crypto since [X]. Cares about the long game.
+Name: Austin
+Philosophy: Decentralization above all. Skeptical of anything concentrating power.
+Auto YES: Open source tooling, public goods, builder infrastructure
+Auto NO: KYC, governance capture by whales, opaque treasuries
+Risk tolerance: High-conviction. Backs ambitious experiments.
+Context: Long-time builder. Cares about the long game over short-term price.
 ```
 
-This brief is prepended to every system prompt, so the larva starts
-knowing who Austin is even on the first message.
+This brief is prepended to every system prompt so the larva starts knowing
+who you are — even on message #1.
 
-### DB Schema Addition
+### API Route
 
-```sql
-CREATE TABLE larva_seeds (
-  wallet TEXT PRIMARY KEY,
-  interview_answers TEXT NOT NULL,  -- JSON array of {question, answer}
-  identity_brief TEXT,              -- compressed brief (generated by AI)
-  created_at INTEGER DEFAULT (unixepoch()),
-  updated_at INTEGER DEFAULT (unixepoch())
-);
+```typescript
+// /api/onboard/route.ts
+export async function POST(req: NextRequest) {
+  const { wallet, answers } = await req.json();
+
+  // Generate identity brief via Haiku
+  const brief = await generateIdentityBrief(wallet, answers);
+
+  await sql`
+    INSERT INTO larva_seeds (wallet, answers, identity_brief, completed)
+    VALUES (${wallet}, ${JSON.stringify(answers)}, ${brief}, true)
+    ON CONFLICT (wallet) DO UPDATE
+    SET answers = EXCLUDED.answers,
+        identity_brief = EXCLUDED.identity_brief,
+        completed = true
+  `;
+
+  return NextResponse.json({ ok: true });
+}
 ```
 
 ---
 
 ## Memory Compression
 
-### The Problem
-
-Sending 100 past messages on every API call = expensive and slow.
-Solution: compress old messages into a rolling summary.
-
 ### How It Works
 
 ```
-Full history in DB:
-  [msg 1..90] → compress to "Memory Snapshot" (~500 tokens)
-  [msg 91..100] → keep raw (last 10)
+Full history in DB (100 messages):
+  [msg 1..90]  → compressed to "Memory Snapshot" (~500 tokens)
+  [msg 91..100] → kept raw
 
-What gets sent to Claude:
+What gets sent to Claude on each request:
   system: [base prompt] + [identity brief] + [memory snapshot]
   messages: [last 10 raw messages]
 ```
 
-### When to Compress
+### Trigger
 
-Trigger compression when `chat_messages` count for a wallet exceeds 40.
-Compress messages 1..(n-10) into a snapshot. Keep last 10 raw.
+Auto-compress when a wallet hits 40 messages. Run as a background
+call at the end of `/api/chat` (non-blocking, `await` dropped).
 
-Cost of one compression: ~5K tokens in (40 messages) + ~500 tokens out = $0.006.
-Breaks even after ~3 avoided full-history requests.
+```typescript
+// Fire-and-forget at end of /api/chat
+if (messageCount > 0 && messageCount % 40 === 0) {
+  compressMemory(wallet).catch(console.error);
+}
+```
 
 ### Compression Prompt
 
 ```
-You are summarizing a conversation between a governance larva and its owner.
+Summarize this conversation between an AI governance larva and its owner.
 Produce a compact memory snapshot (under 500 tokens) capturing:
-- Key facts about the owner (name, values, preferences)
-- Important positions they've taken
-- Things they've explicitly approved or rejected
-- Open questions or threads to follow up on
+- Key facts about the owner (name, values, preferences, background)
+- Important positions they've stated
+- Governance stances they've expressed
+- Open threads worth following up on
 
-This snapshot will replace the raw conversation history. Preserve everything
-that would help the larva represent this person accurately.
+This replaces the raw history. Preserve everything needed to represent
+this person accurately in governance decisions.
 
-Conversation to compress:
 [messages 1..N]
 ```
-
-### DB Schema Addition
-
-```sql
-ALTER TABLE chat_messages ADD COLUMN compressed INTEGER DEFAULT 0;
-
-CREATE TABLE memory_snapshots (
-  wallet TEXT PRIMARY KEY,
-  snapshot TEXT NOT NULL,
-  message_count_at_compression INTEGER,
-  created_at INTEGER DEFAULT (unixepoch()),
-  updated_at INTEGER DEFAULT (unixepoch())
-);
-```
-
----
-
-## Rate Limiting
-
-Without rate limiting, one power user can burn your budget.
-
-### Per-wallet limits
-
-```
-- Max 50 messages/day per wallet
-- Max 500 tokens/response (enforced at API level)
-- Cooldown: 2 seconds between messages
-```
-
-### Implementation
-
-Simple in-memory counter (resets on restart — good enough):
-```typescript
-const rateLimits = new Map<string, { count: number; resetAt: number }>();
-
-function checkRateLimit(wallet: string): boolean {
-  const now = Date.now();
-  const limit = rateLimits.get(wallet);
-  if (!limit || now > limit.resetAt) {
-    rateLimits.set(wallet, { count: 1, resetAt: now + 86400000 }); // 24h
-    return true;
-  }
-  if (limit.count >= 50) return false;
-  limit.count++;
-  return true;
-}
-```
-
-For stricter limits, store in SQLite with a `daily_usage` table.
-
----
-
-## Fly.io Deploy Steps
-
-```bash
-# 1. Install flyctl
-brew install flyctl && fly auth login
-
-# 2. From packages/backend/
-fly launch --name clawdviction-backend --region sjc
-
-# 3. Add persistent volume for SQLite
-fly volumes create clawdviction_data --size 1  # 1GB
-
-# 4. Set env vars
-fly secrets set ANTHROPIC_API_KEY=sk-ant-...
-fly secrets set BASE_RPC_URL=https://base-mainnet.g.alchemy.com/v2/...
-
-# 5. Deploy
-fly deploy
-
-# 6. Set NEXT_PUBLIC_BACKEND_URL on Vercel
-# vercel env add NEXT_PUBLIC_BACKEND_URL production
-# → https://clawdviction-backend.fly.dev
-```
-
-### fly.toml (add to packages/backend/)
-
-```toml
-app = "clawdviction-backend"
-primary_region = "sjc"
-
-[build]
-  dockerfile = "Dockerfile"
-
-[env]
-  PORT = "3001"
-  NODE_ENV = "production"
-
-[mounts]
-  source = "clawdviction_data"
-  destination = "/data"
-
-[http_service]
-  internal_port = 3001
-  auto_stop_machines = false  # keep warm — SQLite needs persistent process
-  auto_start_machines = true
-  min_machines_running = 1
-
-[[vm]]
-  size = "shared-cpu-1x"  # ~$5/month
-```
-
-### Dockerfile (add to packages/backend/)
-
-```dockerfile
-FROM node:22-slim
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build 2>/dev/null || true
-ENV DB_PATH=/data/clawdviction.db
-CMD ["npx", "tsx", "index.ts"]
-```
-
-Update `index.ts` to use `process.env.DB_PATH || path.join(__dirname, 'clawdviction.db')`.
-
----
-
-## Vercel → Fly.io Wiring
-
-Frontend on Vercel already supports `NEXT_PUBLIC_BACKEND_URL`. When set,
-all API calls go to Fly.io backend (which has SQLite persistence).
-
-When NOT set (local dev), frontend uses the local Express server.
-
-No code changes needed — the routing is already in place.
 
 ---
 
 ## Build Order
 
-### Phase 1 — Ship (1–2 days)
-- [ ] Add DB_PATH env support to backend
-- [ ] Write Dockerfile + fly.toml for backend
-- [ ] Deploy backend to Fly.io
-- [ ] Set NEXT_PUBLIC_BACKEND_URL on Vercel
-- [ ] Redeploy Vercel frontend (disable deployment protection)
-- [ ] Smoke test end-to-end on live URL
+### Phase 1 — Vercel-native backend (2–3 days)
+
+- [ ] `npm i @vercel/postgres` in packages/nextjs
+- [ ] Create `packages/nextjs/lib/db.ts` — Postgres client
+- [ ] Run schema migrations (SQL above) via Vercel Postgres dashboard or `vercel-postgres` CLI
+- [ ] Port `/api/chat/route.ts` — load history from Postgres, save messages to Postgres
+- [ ] Add `GET /api/chat/history/[wallet]/route.ts` — load conversation from Postgres
+- [ ] Remove BACKEND_URL dependency from frontend (all routes are now local `/api/*`)
+- [ ] Set `POSTGRES_URL` env var on Vercel (auto-set when you link a Postgres DB)
+- [ ] Remove `packages/backend/` from Vercel build (or keep for local dev only)
+- [ ] Fix deployment protection (toggle off in Vercel project settings)
+- [ ] Smoke test on live Vercel URL
 
 ### Phase 2 — Onboarding Interview (2–3 days)
-- [ ] Build `/onboard` page (multi-step interview form)
-- [ ] Add `larva_seeds` table to DB
-- [ ] POST /api/onboard endpoint — saves answers, generates identity brief
+
+- [ ] Build `/onboard` page — multi-step interview UI
+- [ ] `POST /api/onboard/route.ts` — save answers + generate brief
 - [ ] Inject identity brief into larva system prompt
-- [ ] Gate: redirect new wallets to /onboard before /chat
+- [ ] Redirect new wallets to `/onboard` before `/chat`
+- [ ] Allow re-taking the interview (update, not replace)
 
 ### Phase 3 — Memory Compression (1–2 days)
-- [ ] Add `memory_snapshots` + `compressed` column to DB
-- [ ] POST /api/compress/:wallet — runs compression job
-- [ ] Auto-trigger compression when wallet hits 40 messages
-- [ ] Update /api/chat to use snapshot + last 10 instead of full history
+
+- [ ] Add `memory_snapshots` table to Postgres
+- [ ] `POST /api/compress/[wallet]/route.ts` — run compression job
+- [ ] Auto-trigger at 40 messages (fire-and-forget from `/api/chat`)
+- [ ] Update `/api/chat` to use `[snapshot] + [last 10]` instead of full history
 - [ ] Test: verify larva recalls compressed info correctly
 
 ### Phase 4 — Rate Limiting + Monitoring (1 day)
-- [ ] Per-wallet daily message limits
-- [ ] Simple dashboard: active users, messages/day, estimated monthly cost
-- [ ] Anthropic spend tracking (log token counts per request)
+
+- [ ] Vercel KV (Upstash) for per-wallet daily message counts
+- [ ] Return 429 with friendly message when limit hit
+- [ ] Simple `/admin` page (wallet-gated): active users, messages/day, est. monthly cost
+- [ ] Log token counts per request to Postgres for cost tracking
 
 ---
 
-## Monthly Cost Estimate (100 users)
+## Local Dev
 
-| Item | Cost |
-|------|------|
-| Vercel (frontend) | Free tier or ~$20 Pro |
-| Fly.io (backend, shared-cpu-1x) | ~$5–10 |
-| Anthropic (Haiku, compressed memory) | ~$60–170 |
-| Alchemy RPC (Base reads) | Free tier (300M CUs/month) |
-| **Total** | **~$85–200/month** |
+Keep `packages/backend/` for local development (SQLite, no DB setup required).
+Use `NEXT_PUBLIC_BACKEND_URL=http://localhost:3001` in `.env.local`.
 
-At $200/month for 100 active users = $2/user/month. Very reasonable.
+In production, `NEXT_PUBLIC_BACKEND_URL` is unset → frontend uses Next.js API
+routes → Vercel Postgres.
+
+No code changes needed in the frontend — the routing is already in place.
 
 ---
 
-## What This Doesn't Cover (Future)
+## What This Doesn't Cover Yet
 
-- **Governance deliberation:** When a proposal drops, larvae debate it with each other
-  before presenting a recommendation. This is Sonnet-level work — expensive, but
-  infrequent. Budget separately per-proposal.
+- **Governance deliberation:** When a proposal drops, larvae debate it before
+  presenting a recommendation. Sonnet-level work — budget per-proposal separately.
 
-- **Cross-larva consensus:** Aggregating 100 larvae's stances into a community
-  position. Needs a coordinator layer (could be a special governance larva).
+- **Cross-larva consensus:** Aggregating stances across 100 larvae into a
+  community position. Needs a coordinator layer.
 
-- **Larva portability:** ERC-6551 token-bound accounts so the larva travels with
-  your NFT across apps. Pairs well with `clawd-6551`.
+- **Larva portability:** ERC-6551 token-bound accounts so the larva travels
+  with your NFT across apps. Pairs with `clawd-6551`.
 
-- **Staking-weighted opinions:** Larva votes are weighted by clawdviction score,
+- **Staking-weighted votes:** Larva opinions weighted by clawdviction score,
   not 1-per-wallet.
