@@ -12,7 +12,7 @@ import {
   useTargetNetwork,
 } from "~~/hooks/scaffold-eth";
 
-const BACKEND_URL = "http://localhost:3001";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "";
 
 const StakePage: NextPage = () => {
   const { address: connectedAddress, chain } = useAccount();
@@ -90,7 +90,8 @@ const StakePage: NextPage = () => {
   // Determine state
   const isWrongNetwork = chain && chain.id !== targetNetwork.id;
   const parsedAmount = stakeAmount ? parseEther(stakeAmount) : 0n;
-  const needsApproval = parsedAmount > 0n && (allowance ?? 0n) < parsedAmount;
+  const isLocalNetwork = targetNetwork.id === 31337;
+  const needsApproval = parsedAmount > 0n && ((allowance as bigint) ?? 0n) < parsedAmount;
 
   const formatClawdviction = (score: string) => {
     const n = Number(score) / 1e18; // scores are in wei-seconds
@@ -221,17 +222,21 @@ const StakePage: NextPage = () => {
             </button>
           )}
 
-          {/* Faucet */}
-          <div className="divider">Testing</div>
-          <button className="btn btn-outline btn-sm" onClick={handleFaucet} disabled={isFauceting}>
-            {isFauceting ? (
-              <>
-                <span className="loading loading-spinner loading-xs"></span> Minting...
-              </>
-            ) : (
-              "🚰 Get 10,000 Test CLAWD"
-            )}
-          </button>
+          {/* Faucet — local dev only */}
+          {isLocalNetwork && (
+            <>
+              <div className="divider">Testing</div>
+              <button className="btn btn-outline btn-sm" onClick={handleFaucet} disabled={isFauceting}>
+                {isFauceting ? (
+                  <>
+                    <span className="loading loading-spinner loading-xs"></span> Minting...
+                  </>
+                ) : (
+                  "🚰 Get 10,000 Test CLAWD"
+                )}
+              </button>
+            </>
+          )}
         </div>
       </div>
 

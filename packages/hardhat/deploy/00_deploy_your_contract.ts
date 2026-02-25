@@ -24,3 +24,7 @@ const deployContracts: DeployFunction = async function (hre: HardhatRuntimeEnvir
 
 export default deployContracts;
 deployContracts.tags = ["MockCLAWD", "ClawdVictionStaking"];
+// Only run on localhost/hardhat - not on real networks
+deployContracts.skip = async hre => {
+  return hre.network.name !== "localhost" && hre.network.name !== "hardhat";
+};

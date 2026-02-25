@@ -6,7 +6,7 @@ import type { NextPage } from "next";
 import { useAccount } from "wagmi";
 import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 
-const BACKEND_URL = "http://localhost:3001";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "";
 const CLAWDVICTION_THRESHOLD = 1_000_000n * 10n ** 18n; // 1M in wei-seconds
 
 interface Message {
