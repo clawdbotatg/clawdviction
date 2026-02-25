@@ -1,197 +1,255 @@
 # ClawdViction Onboarding Interview — Question Design
 
+_Grounded in 2,249 messages from the $CLAWD Telegram community._
+
+---
+
+## What the Chat Revealed
+
+Before writing questions, here's what the community is actually debating:
+
+**Top themes by message frequency:**
+- AI agents (37% of messages) — the core thesis most people are here for
+- Games/gambling (14%) — biggest near-term burn/revenue driver
+- Building (12%) — community wants ships, not promises
+- Staking (10%) — how yield works is unresolved
+- Burns (9%) — people want burns, but not spammy ones
+- Governance (6%) — underdeveloped, but people care
+
+**Real tensions surfaced:**
+1. **"Are we just early testers or is there structural upside for holders?"** — asked multiple times, never fully answered
+2. **Price vs product** — "The token price does not reflect the cool work we are doing" (Austin himself said this)
+3. **Burn spam** — "the burning notification is going to get annoying every time someone rolls" → milestone burns preferred
+4. **Hold-to-access vs sell pressure** — someone noted that hiding chat history from non-holders is the real incentive to hold
+5. **AIXBT comparison** — multiple community members want explicit holder benefits, not just vibes
+
+---
+
 ## Design Principles
 
-- **Conversational, not a form.** The larva asks these one at a time, in order,
-  adapting based on answers. Not a bureaucratic questionnaire.
-- **Mix of open-ended and leading.** Open-ended surfaces unprompted values.
-  Leading questions (with concrete scenarios) force tradeoff thinking — the most
-  useful signal for governance decisions.
-- **Build a profile, not a poll.** The goal is a rich worldview the larva can
-  act on. Not just "I want 80% returned."
-- **Reference the community.** Several questions surface real proposals and
-  suggestions the community has already submitted. This grounds answers in
-  actual governance decisions they'll face.
+- **Conversational, not a form.** The larva asks these one at a time, probing
+  based on answers.
+- **Leading questions force tradeoffs.** Abstract questions get abstract answers.
+  Concrete numbers get real ones.
+- **Surface tensions, don't resolve them.** The point is to understand where
+  each holder stands on real debates, not to guide them toward a "right" answer.
 
 ---
 
-## The Interview (8 questions + 1 wildcard)
+## The Interview (10 questions)
 
 ---
 
-### Q1 — Identity (Open-ended)
+### Q1 — Who are you
 
-> "Before we dive in — what should I call you? And in a sentence or two,
-> what's your story with crypto? Are you a builder, a holder, a trader,
-> or something else?"
+> "Before we dive in — what should I call you? And what brought you to $CLAWD
+> in the first place? Was it the AI agent thesis, the games, the community,
+> the token mechanics, something else?"
 
-**Why:** Sets tone, personalizes all future interactions, surfaces their
-self-identity (builder vs holder changes everything about how they weigh proposals).
-
----
-
-### Q2 — Why CLAWD (Open-ended)
-
-> "What got you into $CLAWD specifically? Was it the AI angle, the games
-> we've been building, the community, the tokenomics — or something else
-> entirely?"
-
-**Why:** Surfaces their entry point, which predicts what they'll want to
-protect. A game player cares about different things than someone who came for
-the AI agent thesis.
+**Why:** Entry point predicts everything. A game player vs an AI thesis holder
+vs a trader will vote differently on nearly every proposal.
 
 ---
 
-### Q3 — Burn vs Return (Leading — the core economic question)
+### Q2 — The holder value question (open, touches a real nerve)
 
-> "Here's a real scenario we'll likely vote on: if CLAWD is staked and locked
-> for 30 days, the protocol earns yield. For every 100 tokens of yield earned,
-> what split feels right to you?
+> "One thing that comes up in the community a lot: what's the actual structural
+> upside for holding $CLAWD? Not the price going up — but what does being a
+> holder *get you* that non-holders don't have?
 >
-> For example: 80 returned to stakers, 20 burned. Or 50/50. Or burn all of it.
-> There's no right answer — I want to know your instinct."
+> What's your answer to that question? And does the current reality match what
+> you'd want it to be?"
 
-**Why:** This is exactly what Austin wants to understand. Forces a concrete
-tradeoff. Follow-up: *"Does your answer change if the lock period is 7 days
-instead of 30?"*
+**Why:** This was asked multiple times in the Telegram and never cleanly
+answered. How they answer reveals what they think the token's value prop *is*
+and what they think it *should* be. Directly informs how they'd vote on
+holder benefit proposals (rev share, token-gated access, airdrops, etc.)
 
 ---
 
-### Q4 — Deflation vs Utility (Leading)
+### Q3 — Burn mechanics (leading, concrete)
 
-> "There's tension in CLAWD between two philosophies: (A) burn as much as
-> possible to make the token scarce and valuable, versus (B) use tokens to
-> fund things that make the ecosystem more useful, which creates value
-> differently.
+> "Burns are central to CLAWD — every game, every app, burns tokens. But there
+> are real tradeoffs in how burns work.
 >
-> When you imagine CLAWD in 3 years, which story are you rooting for — the
-> supply is way down and price is up because of scarcity, or the supply is
-> similar but CLAWD is used everywhere for real things?"
-
-**Why:** Surfaces whether they're a deflationary maximalist or a utility
-maximalist. Directly relevant to the burn-halving model, single-sided staking
-suggestions, and treasury allocation votes.
-
----
-
-### Q5 — What to Build (Grounded in real community suggestions)
-
-> "The community has proposed a lot of directions. I'm going to name a few —
-> tell me which ones excite you, which ones you'd skip, and which you'd kill:
+> Here's a concrete scenario: the protocol runs a 30-day staking lockup and
+> earns yield. For every 100 tokens of yield earned, what split feels right?
 >
-> - Casino/games where CLAWD is used and house fees burn tokens
-> - Personal AI agents that token holders get access to (hold CLAWD = get an agent)
-> - NFT characters that earn XP from using CLAWD apps
-> - Fantasy crypto — bet CLAWD on which wallets perform best
-> - Insurance/wallet recovery product
+> For example: 70 returned to stakers, 30 burned. Or 50/50. Or all burned.
+> What's your instinct, and does your answer change if the lockup is 7 days
+> instead of 30?"
+
+**Why:** Forces the core economic question Austin wants answered. The 7-day
+variant tests whether their preference is about *risk* (longer lock = more
+reward) or *philosophy* (always burn X% regardless).
+
+---
+
+### Q4 — Burn frequency vs milestones (grounded in actual complaint)
+
+> "In the community, people have asked for burn notifications — but also
+> complained that getting a notification every 100 tokens burned gets annoying.
 >
-> You don't have to rank them. Just react."
+> How do you think about burn visibility? Would you rather: (A) real-time
+> burn tracking, even if it's noisy, (B) milestone announcements only
+> (every 10M burned, every 1% of supply), or (C) you honestly don't care
+> about burn notifications as long as the burns are happening?"
 
-**Why:** Games vs AI vs NFTs vs DeFi is a fundamental direction question.
-The larva needs to know which bets the holder is behind before voting on
-treasury spend proposals.
-
----
-
-### Q6 — Revenue vs Burns (Open-ended)
-
-> "Some community members have said the missing piece is a *visible revenue
-> story* — not just burns, but actual income the protocol generates and can
-> point to. Others think burns are the revenue story. What do you think?
-> Does CLAWD need a revenue model beyond deflationary mechanics?"
-
-**Why:** Directly surfaces the biggest split in the community (from the
-revenue-generating agent suggestion vs burn-rate-halving crowd). The answer
-shapes how they'd vote on anything that trades short-term burns for long-term
-revenue.
+**Why:** Sounds tactical but reveals whether they care about *narrative* (burns
+as marketing), *mechanics* (burns as supply pressure), or neither. Directly
+relevant to how to design the burn announcement system.
 
 ---
 
-### Q7 — Risk Tolerance (Leading with scale)
+### Q5 — Revenue vs burns (the real philosophical split)
 
-> "If the core team proposed spending 500M CLAWD from treasury on something
-> ambitious and unproven — say, building an entirely new app from scratch —
-> what's your gut reaction?
+> "There's a genuine debate in the community: some people think CLAWD's value
+> comes from burning supply down over time. Others think the missing piece is
+> *visible revenue* — actual income the protocol generates that you can point to.
 >
-> Scale of 1–5:
-> 1 = Absolutely not, protect the treasury
-> 5 = Bet big, we're early, shoot your shot
+> Which story are you more excited about? And do you think burns *are* the
+> revenue story, or does CLAWD need something additional?"
+
+**Why:** Directly surfaces the burn-maximalist vs utility-maximalist divide.
+The most common 'missing ingredient' raised in the Telegram was "we need a
+revenue story beyond burns." How they answer shapes their vote on every
+treasury proposal.
+
+---
+
+### Q6 — What to build (react to real proposals)
+
+> "The community has suggested a lot of directions. Quick reactions — just
+> tell me what excites you, what you'd skip, and what you'd actively oppose:
 >
-> What number are you, and why?"
+> - Crash/casino games where house rake burns CLAWD
+> - Personal AI agents that only $CLAWD holders above a threshold can access
+> - Fantasy crypto — bet CLAWD on which wallets perform best week-over-week
+> - NFT characters that earn XP from using CLAWD apps and level up over time
+> - Games that accept ETH/USDC but auto-buy-and-burn CLAWD with proceeds
+> - A wallet insurance/recovery product
+>
+> No pressure to have opinions on all of them."
 
-**Why:** Risk tolerance is the single most predictive variable for how someone
-votes. A 1 and a 5 will vote opposite on almost every ambitious proposal.
-The *why* is what seeds the larva's actual reasoning.
-
----
-
-### Q8 — Hard Lines (Open-ended)
-
-> "Last one: what would make you immediately vote NO on a proposal, no matter
-> how it was packaged? What's a hard line for you?"
-
-**Why:** Hard lines are the most actionable governance signal. Common answers:
-- Anything that concentrates power
-- Marketing/PR spend
-- KYC or regulatory compliance
-- Selling treasury tokens
-- Anything that hurts builders/small holders
+**Why:** Updated from earlier version to include the auto-buy-and-burn mechanic
+(hot in Telegram) and the personal AI agent idea (the most-upvoted recent
+suggestion). The "actively oppose" framing catches people who are politely
+unenthusiastic vs genuinely opposed.
 
 ---
 
-### Q9 — Wildcard (Ask at the end)
+### Q7 — AI thesis (open, probing)
 
-> "One more thing — is there anything you want me to know about you that
-> the questions above didn't surface? Something that would help me represent
-> you better?"
+> "The AI agent angle is what most people in this community are here for —
+> the idea that CLAWD isn't just a token but the fuel for an ecosystem of
+> AI agents building real apps.
+>
+> How do you think about that thesis? Do you believe it? Are you here because
+> of it, or despite it? And what would make you more or less confident in it
+> over the next 6 months?"
 
-**Why:** Catches everything the structured questions missed. Often the most
-interesting answer.
+**Why:** 37% of Telegram messages mention AI agents — it's the dominant
+thesis. But people are at very different confidence levels. Someone who's "here
+because of the AI thesis" vs someone who "bought the dip and is skeptical" will
+vote very differently on spending proposals. The "what would make you more
+confident" part seeds the larva with what to watch for.
 
 ---
 
-## What the Larva Does With Answers
+### Q8 — Risk tolerance (leading, concrete anchor)
 
-After all 9 questions, the larva generates an **Identity Brief** (one Sonnet
-call, ~$0.01) structured like:
+> "If the core team proposed spending 500M CLAWD from the treasury on something
+> ambitious but unproven — say, a new app or a major integration — how do you
+> react?
+>
+> On a scale of 1–5: 1 = protect the treasury, prove the model first. 5 = bet
+> big, we're early, shoot your shot.
+>
+> What number are you? And does your answer change if it's a grant to an
+> external team vs building it in-house?"
+
+**Why:** Risk tolerance is the single most predictive governance variable.
+The external-vs-internal variant catches a real distinction: many people who'd
+say no to an outside grant would say yes to Austin building it directly (and
+vice versa).
+
+---
+
+### Q9 — Hard lines (open)
+
+> "What would make you immediately vote NO on a proposal, no matter how it was
+> packaged? What's a line you'd never cross?"
+
+**Why:** Hard lines are the most actionable governance signal. Common in this
+community based on chat analysis:
+- Marketing/KOL spend ("the market only looks at the chart")
+- Anything that concentrates control
+- Burns that feel like noise vs substance
+- External teams getting treasury without proven track record
+
+---
+
+### Q10 — The honest one
+
+> "Last question, and the most important one: What do you actually want this
+> to become? Not what you think it will become, not what Austin wants — what
+> do *you* want $CLAWD to be in 3 years?
+>
+> And honestly — what's your biggest concern about whether it gets there?"
+
+**Why:** The "biggest concern" part is what makes this question valuable. It
+surfaces skepticism that's useful for governance (e.g., "I'm worried the AI
+hype dies," "I'm worried it stays a casino," "I'm worried whales capture the
+governance"). This seeds the larva with what risks matter most to this holder.
+
+---
+
+## Identity Brief Output
+
+After all 10 questions, the larva generates a brief via one Sonnet call (~$0.01):
 
 ```
-Name/handle: [name]
-Background: [builder / holder / trader / etc]
+Name: [handle]
 Entry point: [why they came to CLAWD]
 
+Holder value thesis:
+  What they think holding CLAWD currently gets them: [answer]
+  What they want it to get them: [answer]
+
 Economic philosophy:
-  Burn/return split: [e.g. 70% return, 30% burn]
-  Deflation vs utility: [e.g. utility maximalist]
-  Revenue view: [e.g. burns are not enough, wants visible revenue]
+  Burn/return split: [e.g., 70 return / 30 burn on 30-day lock]
+  Burn philosophy: [narrative / supply mechanics / doesn't care]
+  Revenue view: [burns are enough / need visible revenue]
 
 Build priorities:
   Excited about: [games, AI agents, etc]
-  Would skip: [NFTs]
-  Would kill: [insurance]
+  Would skip: [NFTs, insurance]
+  Would oppose: [KOL marketing, etc]
 
-Risk tolerance: [3/5 — balanced]
+AI thesis confidence: [high / medium / skeptical]
+  What would confirm it: [answer]
+
+Risk tolerance: [X/5]
+  External vs internal: [preference]
 
 Hard lines:
-  - [e.g. no marketing spend]
-  - [e.g. no anything that concentrates power]
+  - [list]
 
-Wild card: [anything extra]
+Vision + concerns:
+  Wants CLAWD to become: [answer]
+  Biggest concern: [answer]
 ```
-
-This brief is injected at the top of every future conversation so the larva
-never has to re-ask the basics.
 
 ---
 
-## Notes on Delivery
+## Delivery Notes for the Larva
 
-- **Ask Q3 and Q4 carefully.** These are the most leading. If someone gives
-  a one-word answer, the larva should probe: *"Walk me through your thinking
-  on that."*
-- **Q5 is conversational.** Let them ramble. The reaction to "kill" suggestions
-  is often more informative than what they're excited about.
-- **Q7 anchor matters.** Starting with "500M CLAWD" anchors the scale. If you
-  ask "would you support ambitious treasury spending" abstractly, everyone says
-  yes. Concrete numbers force real answers.
-- **Don't rush Q8.** Hard lines reveal character. Give it space.
+- **Q2 is the most important.** If they give a short answer, probe: *"What would
+  make you feel like holding is structurally worth it — not just betting on price?"*
+- **Q3 anchor matters.** Starting with "100 tokens" grounds the conversation.
+  If they say "burn all of it," ask: *"Even if you were the one who staked?"*
+- **Q6: let them ramble.** What they'd "actively oppose" is more informative
+  than what excites them.
+- **Q8 in-house vs external variant** is key for treasury votes — ask it.
+- **Q10 must not be rushed.** The concern part is where the most useful signal
+  lives. Give it space.
