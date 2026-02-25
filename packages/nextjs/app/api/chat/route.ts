@@ -19,7 +19,7 @@ This conversation persists — you remember everything across sessions.`;
 
 export async function POST(request: NextRequest) {
   try {
-    const { wallet, message, messages } = await request.json();
+    const { wallet, message, messages, identityBrief } = await request.json();
 
     if (!wallet || !message) {
       return NextResponse.json({ error: "Missing wallet or message" }, { status: 400 });
@@ -43,9 +43,9 @@ export async function POST(request: NextRequest) {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5",
+        model: "claude-haiku-4-6",
         max_tokens: 400,
-        system: LARVA_SYSTEM_PROMPT(wallet),
+        system: LARVA_SYSTEM_PROMPT(wallet) + (identityBrief ? `\n\n${identityBrief}` : ""),
         messages: history,
       }),
     });

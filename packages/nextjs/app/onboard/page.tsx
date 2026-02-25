@@ -195,6 +195,9 @@ const OnboardPage: NextPage = () => {
       const data = await res.json();
       setBrief(data.identity_brief);
       setDone(true);
+      if (data.identity_brief && address) {
+        localStorage.setItem(`clawdviction-brief-${address}`, data.identity_brief);
+      }
     } catch (e) {
       console.error(e);
     } finally {

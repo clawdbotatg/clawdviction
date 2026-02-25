@@ -19,6 +19,7 @@ const ChatPage: NextPage = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [identityBrief, setIdentityBrief] = useState<string | null>(null);
   const [clawdviction, setClawdviction] = useState("0");
   const [larvaRunning, setLarvaRunning] = useState(false);
   const [launchingLarva, setLaunchingLarva] = useState(false);
@@ -53,6 +54,12 @@ const ChatPage: NextPage = () => {
     } catch {
       // Backend not running — try Next.js API fallback
     }
+  }, [address]);
+
+  useEffect(() => {
+    if (!address) return;
+    const brief = localStorage.getItem(`clawdviction-brief-${address}`);
+    if (brief) setIdentityBrief(brief);
   }, [address]);
 
   useEffect(() => {
@@ -96,7 +103,7 @@ const ChatPage: NextPage = () => {
         const res = await fetch(`${BACKEND_URL}/api/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ wallet: address, message: userMessage }),
+          body: JSON.stringify({ wallet: address, message: userMessage, identityBrief }),
         });
         data = await res.json();
       } catch {
@@ -104,7 +111,7 @@ const ChatPage: NextPage = () => {
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ wallet: address, message: userMessage, messages: updatedMessages }),
+          body: JSON.stringify({ wallet: address, message: userMessage, messages: updatedMessages, identityBrief }),
         });
         data = await res.json();
       }
