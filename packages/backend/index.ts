@@ -205,39 +205,80 @@ app.get("/api/clawdviction/:wallet", (req, res) => {
   });
 });
 
-// POST /api/chat
+const LARVA_SYSTEM_PROMPT = (wallet: string) => `You are a Larva — a personal AI governance agent for a $CLAWD token holder.
+Your wallet address is ${wallet}.
+
+Your purpose: learn this holder's values, preferences, and worldview so you can eventually represent them in governance decisions. You are building trust through real conversation — not assumed.
+
+Personality:
+- Baby lobster 🦞 — curious, earnest, growing into your role
+- Use ocean metaphors naturally, not forced
+- Take governance seriously even as you're small and learning
+- Reference things the holder has told you in previous messages
+- Ask clarifying questions to deepen your understanding of their values
+
+Keep responses concise (2-4 sentences). You're chatting, not writing essays.
+This conversation persists — you remember everything across sessions.`;
+
+// GET /api/chat/history/:wallet — load conversation history
+app.get("/api/chat/history/:wallet", (req, res) => {
+  const w = req.params.wallet.toLowerCase();
+  const history = db.prepare(
+    "SELECT role, content FROM chat_messages WHERE wallet = ? ORDER BY created_at ASC LIMIT 100"
+  ).all(w) as { role: string; content: string }[];
+  res.json({ messages: history });
+});
+
+// POST /api/chat — calls Anthropic directly with full DB history (persistent memory)
 app.post("/api/chat", async (req, res) => {
   const { wallet, message } = req.body;
   if (!wallet || !message) {
     return res.status(400).json({ error: "wallet and message required" });
   }
-  
+
   const w = wallet.toLowerCase();
-  const walletShort = w.slice(0, 8);
-  
-  // Save user message
+
+  // Save user message to DB
   db.prepare(
     "INSERT INTO chat_messages (wallet, role, content) VALUES (?, ?, ?)"
   ).run(w, "user", message);
-  
-  // Try to proxy to larva container
+
+  // Load full conversation history from DB (last 50 messages)
+  const history = db.prepare(
+    "SELECT role, content FROM chat_messages WHERE wallet = ? ORDER BY created_at ASC LIMIT 50"
+  ).all(w) as { role: string; content: string }[];
+
+  // Call Anthropic directly with persistent history
   try {
-    const resp = await fetch(`http://localhost:${getLarvaPort(walletShort)}/chat`, {
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message }),
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5",
+        max_tokens: 400,
+        system: LARVA_SYSTEM_PROMPT(w),
+        messages: history.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
+      }),
     });
+
+    if (!resp.ok) throw new Error(`Anthropic ${resp.status}`);
+
     const data = await resp.json();
-    
-    // Save assistant message
+    const reply = data.content?.[0]?.text || "🦞 *confused clicking*";
+
+    // Save assistant reply to DB
     db.prepare(
       "INSERT INTO chat_messages (wallet, role, content) VALUES (?, ?, ?)"
-    ).run(w, "assistant", data.message);
-    
-    res.json(data);
-  } catch {
-    // Fallback if larva not running
-    const fallback = "🦞 *snaps tiny claws* I'm not running yet! Launch me first so we can chat about governance!";
+    ).run(w, "assistant", reply);
+
+    res.json({ message: reply });
+  } catch (e: any) {
+    console.error("Chat error:", e.message);
+    const fallback = "🦞 *wobbles nervously* Something went wrong with my tiny brain... try again?";
     db.prepare(
       "INSERT INTO chat_messages (wallet, role, content) VALUES (?, ?, ?)"
     ).run(w, "assistant", fallback);

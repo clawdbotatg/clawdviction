@@ -24,7 +24,21 @@ const ChatPage: NextPage = () => {
   const [launchingLarva, setLaunchingLarva] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Poll clawdviction from backend
+  // Load chat history from backend on mount
+  const loadHistory = useCallback(async () => {
+    if (!address) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/chat/history/${address}`);
+      const data = await res.json();
+      if (data.messages?.length > 0) {
+        setMessages(data.messages as Message[]);
+      }
+    } catch {
+      // Backend not running — start with empty history
+    }
+  }, [address]);
+
+  // Poll clawdviction + larva status from backend
   const fetchStatus = useCallback(async () => {
     if (!address) return;
     try {
@@ -42,10 +56,11 @@ const ChatPage: NextPage = () => {
   }, [address]);
 
   useEffect(() => {
+    loadHistory();
     fetchStatus();
     const interval = setInterval(fetchStatus, 3000);
     return () => clearInterval(interval);
-  }, [fetchStatus]);
+  }, [loadHistory, fetchStatus]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -69,13 +84,15 @@ const ChatPage: NextPage = () => {
     if (!input.trim() || loading) return;
     const userMessage = input.trim();
     setInput("");
-    setMessages(prev => [...prev, { role: "user", content: userMessage }]);
+    // Build updated message list (including new user message)
+    const updatedMessages: Message[] = [...messages, { role: "user", content: userMessage }];
+    setMessages(updatedMessages);
     setLoading(true);
 
     try {
-      // Try backend first, fall back to Next.js API
       let data;
       try {
+        // Backend: handles its own history via SQLite — just send wallet + message
         const res = await fetch(`${BACKEND_URL}/api/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -83,10 +100,11 @@ const ChatPage: NextPage = () => {
         });
         data = await res.json();
       } catch {
+        // Next.js fallback: send full message history for session continuity
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ wallet: address, message: userMessage }),
+          body: JSON.stringify({ wallet: address, message: userMessage, messages: updatedMessages }),
         });
         data = await res.json();
       }
