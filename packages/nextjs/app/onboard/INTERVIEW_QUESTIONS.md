@@ -189,11 +189,25 @@ community based on chat analysis:
 
 ---
 
-### Q10 — The honest one
+### Q10 — Magic wand
 
-> "Last question, and the most important one: What do you actually want this
-> to become? Not what you think it will become, not what Austin wants — what
-> do *you* want $CLAWD to be in 3 years?
+> "If you could wave a magic wand and have one thing happen for $CLAWD —
+> anything at all, no constraints, no 'is it realistic' — what would it be?"
+
+**Why:** After 9 structured questions, this unlocks what people actually want
+at a gut level, unconstrained by what they think is possible. The answers
+tend to be more honest and more surprising than anything a leading question
+surfaces. Some will say price, some will say a specific app, some will say
+"every AI agent runs on CLAWD," some will say "Austin gets on a podcast with
+Vitalik." All of it is useful signal for the larva.
+
+---
+
+### Q11 — The honest one
+
+> "Last question: What do you actually want this to become? Not what you think
+> it will become, not what Austin wants — what do *you* want $CLAWD to be in
+> 3 years?
 >
 > And honestly — what's your biggest concern about whether it gets there?"
 
@@ -235,6 +249,8 @@ Risk tolerance: [X/5]
 Hard lines:
   - [list]
 
+Magic wand: [exactly what they said — verbatim, this one matters]
+
 Vision + concerns:
   Wants CLAWD to become: [answer]
   Biggest concern: [answer]
@@ -251,5 +267,8 @@ Vision + concerns:
 - **Q6: let them ramble.** What they'd "actively oppose" is more informative
   than what excites them.
 - **Q8 in-house vs external variant** is key for treasury votes — ask it.
-- **Q10 must not be rushed.** The concern part is where the most useful signal
+- **Q10 (magic wand) — don't interpret, just receive.** Whatever they say,
+  store it verbatim. Don't push back, don't analyze it in the moment. Just
+  say "I'll hold onto that" and move on. The larva can reference it later.
+- **Q11 must not be rushed.** The concern part is where the most useful signal
   lives. Give it space.
