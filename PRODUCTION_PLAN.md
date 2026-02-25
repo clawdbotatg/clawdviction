@@ -87,24 +87,50 @@ An Opus 4.6 session at that same size costs ~$2.46 per message.
 - Reserve Opus for genuinely complex tasks; use Sonnet for triage/chat
 - Don't spawn sub-agents for simple work
 
-**For ClawdViction specifically — use the cheapest model possible:**
-- Claude Haiku 4.5: $0.80/MTok input, $4/MTok output
-- A larva chat message with 2K tokens of compressed history costs **~$0.002**
-- 100 users × 20 msgs/day = 2000 requests × $0.002 = **$4/day** with compression
-- Without compression (20K token history): $0.016/msg → **$32/day**
+**For ClawdViction — model selection matters:**
 
-Compression is not optional. It's what keeps the bill at $4/day vs $32/day.
+Tested both Haiku and Sonnet on multi-turn governance reasoning (10-message
+conversation, then "vote on a 500K PR proposal"). Results:
+
+- Haiku: synthesized 3 stated values correctly, gave structured reasoning, made
+  a constructive counter-suggestion. Not falling apart.
+- Sonnet: synthesized 2 values, slightly cleaner phrasing.
+
+Haiku is legitimately capable for routine chat. The case for Sonnet is the
+**onboarding interview** — a one-time, high-stakes event where the quality of
+probing follow-up questions directly seeds all future memory. Spend more there.
+
+### Model-per-task breakdown
+
+| Task | Model | Why |
+|------|-------|-----|
+| Onboarding interview | **Sonnet** | One-time, seeds all future memory, quality matters |
+| Regular larva chat | **Haiku** | Frequent, proven capable, 4x cheaper |
+| Memory compression | **Haiku** | Batch summarization, simple task |
+| Governance deliberation (future) | **Sonnet/Opus** | Complex cross-larva reasoning |
+
+### Cost with compression + tiered models
+
+| Scenario | Daily cost | Monthly |
+|----------|-----------|---------|
+| 100 users, 20 msgs/day, Haiku + compression | ~$4/day | **~$120** |
+| 100 users, 20 msgs/day, Sonnet + compression | ~$21/day | **~$630** |
+| 100 users, 20 msgs/day, Sonnet, NO compression | ~$60/day | **~$1,800** |
+| 100 onboarding interviews (Sonnet, one-time) | ~$2 total | ~$2 |
+
+Compression is what makes Haiku viable. Without it, history grows and even
+Haiku gets expensive. **Build compression before launch.**
 
 ## Monthly Cost (100 active users)
 
 | Item | Cost |
 |------|------|
-| Vercel Pro (includes Postgres + cron + bandwidth) | $20 |
-| Anthropic Haiku + compression (~$4/day) | ~$120 |
+| Vercel Pro (includes Postgres + bandwidth) | $20 |
+| Anthropic: Haiku chat + Sonnet interviews + compression | ~$120–150 |
 | Alchemy RPC — Base reads (free tier) | $0 |
-| **Total marginal cost of ClawdViction** | **~$140/month** |
+| **Total marginal cost of ClawdViction** | **~$140–170/month** |
 
-~$1.40 per user per month. Does not affect your existing OpenClaw bill.
+~$1.50/user/month. Does not compound your existing OpenClaw bill.
 
 ---
 
