@@ -73,16 +73,38 @@ snapshot (~500 tokens), then send: `[identity brief] + [snapshot] + [last 10 mes
 
 ---
 
+## The Real Anthropic Cost Problem
+
+Before talking about 100 users — the main bill driver isn't ClawdViction.
+It's **context window × expensive model × message frequency**.
+
+A Sonnet 4.6 session at 164K tokens costs ~$0.49 in *input alone* per message.
+An Opus 4.6 session at that same size costs ~$2.46 per message.
+50 Opus messages/day in a long session = ~$125/day. Add sub-agents and you're at $200/day.
+
+**The fix for your existing bill (separate from ClawdViction):**
+- Start new sessions more often (`/new`) — don't let sessions hit 200K tokens
+- Reserve Opus for genuinely complex tasks; use Sonnet for triage/chat
+- Don't spawn sub-agents for simple work
+
+**For ClawdViction specifically — use the cheapest model possible:**
+- Claude Haiku 4.5: $0.80/MTok input, $4/MTok output
+- A larva chat message with 2K tokens of compressed history costs **~$0.002**
+- 100 users × 20 msgs/day = 2000 requests × $0.002 = **$4/day** with compression
+- Without compression (20K token history): $0.016/msg → **$32/day**
+
+Compression is not optional. It's what keeps the bill at $4/day vs $32/day.
+
 ## Monthly Cost (100 active users)
 
 | Item | Cost |
 |------|------|
 | Vercel Pro (includes Postgres + cron + bandwidth) | $20 |
-| Anthropic Haiku (with compression) | $60–170 |
+| Anthropic Haiku + compression (~$4/day) | ~$120 |
 | Alchemy RPC — Base reads (free tier) | $0 |
-| **Total** | **$80–190/month** |
+| **Total marginal cost of ClawdViction** | **~$140/month** |
 
-~$1–2 per user per month.
+~$1.40 per user per month. Does not affect your existing OpenClaw bill.
 
 ---
 
