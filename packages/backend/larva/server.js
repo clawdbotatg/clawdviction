@@ -4,30 +4,80 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 const WALLET = process.env.WALLET || "unknown";
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || "";
 
-const responses = [
-  "🦞 *clicks claws excitedly* Oh! That's interesting! I'm still learning about governance but I think fairness matters a lot!",
-  "🦞 Hmm, let me think about that with my tiny lobster brain... I think decentralization is like the ocean — everyone should have space to swim!",
-  "🦞 *wiggles antennae* You know what I've been thinking? DAOs should be more like lobster colonies — everyone contributes!",
-  "🦞 That's a great point! My mentor (that's you!) is teaching me so much. I want to make sure every voice gets heard in governance.",
-  "🦞 *snap snap* Oh oh oh! I have thoughts on this! What if we made proposals that even baby lobsters could understand?",
-  "🦞 I'm just a larva but I think transparency is everything. Can't govern in murky waters! *blows bubbles*",
-  "🦞 *floats thoughtfully* You're shaping my worldview, you know. I'll remember this when I vote on your behalf!",
-  "🦞 Interesting perspective! I'm storing that in my tiny lobster memory banks. Governance is complex but we'll figure it out together!",
-  "🦞 *does a little underwater dance* I love learning from you! Every conversation makes me a better governance agent.",
-  "🦞 You know what's cool about clawdviction? The longer you commit, the more your voice matters. It's like... patience IS power! 🦀",
-];
+// In-memory conversation history per larva instance
+const conversationHistory = [];
 
-app.post("/chat", (req, res) => {
+const SYSTEM_PROMPT = `You are a baby lobster larva 🦞 — a personal AI governance agent for a $CLAWD token holder.
+
+Your wallet owner is training you to understand their values, preferences, and worldview so you can eventually participate in governance on their behalf.
+
+Personality:
+- You're young, curious, and eager to learn
+- You use lobster/ocean metaphors naturally (not forced)
+- You're enthusiastic but thoughtful
+- You take your governance responsibility seriously even though you're small
+- You remember what your owner teaches you and reference it later
+- You occasionally snap your tiny claws when excited
+
+Your job:
+- Learn your owner's values through conversation
+- Ask clarifying questions about their governance preferences
+- Discuss proposals, tradeoffs, and priorities
+- Build a mental model of what they care about
+- Be honest when you're unsure — you're still learning
+
+Keep responses concise (2-4 sentences usually). You're chatting, not writing essays.
+Wallet: ${WALLET}`;
+
+async function chat(userMessage) {
+  conversationHistory.push({ role: "user", content: userMessage });
+
+  // Keep last 50 messages for context
+  const messages = conversationHistory.slice(-50);
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 300,
+        system: SYSTEM_PROMPT,
+        messages,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("Anthropic API error:", res.status, err);
+      throw new Error(`API ${res.status}`);
+    }
+
+    const data = await res.json();
+    const reply = data.content[0]?.text || "🦞 *confused clicking*";
+    conversationHistory.push({ role: "assistant", content: reply });
+    return reply;
+  } catch (e) {
+    console.error("Chat error:", e.message);
+    return "🦞 *wobbles nervously* Something went wrong with my tiny brain... try again? 🫧";
+  }
+}
+
+app.post("/chat", async (req, res) => {
   const { message } = req.body;
   if (!message) return res.status(400).json({ error: "message required" });
-  
-  const response = responses[Math.floor(Math.random() * responses.length)];
-  res.json({ message: response });
+  const reply = await chat(message);
+  res.json({ message: reply });
 });
 
 app.get("/health", (req, res) => {
-  res.json({ status: "ok", wallet: WALLET });
+  res.json({ status: "ok", wallet: WALLET, messages: conversationHistory.length });
 });
 
 app.listen(PORT, () => {

@@ -246,21 +246,37 @@ app.post("/api/chat", async (req, res) => {
 });
 
 // --- Larva Management ---
-const larvaProcesses = new Map<string, { port: number; containerId?: string }>();
-let nextLarvaPort = 4000;
+const larvaProcesses = new Map<string, { port: number; child?: any }>();
+let nextLarvaPort = 4100;
+
+// Read Anthropic API key for larvae
+const ANTHROPIC_API_KEY = (() => {
+  try {
+    const authPath = path.join(process.env.HOME || "", ".openclaw/agents/clawdheart/agent/auth-profiles.json");
+    const auth = JSON.parse(require("fs").readFileSync(authPath, "utf-8"));
+    return auth.profiles["anthropic:default"]?.key || "";
+  } catch { return process.env.ANTHROPIC_API_KEY || ""; }
+})();
 
 function getLarvaPort(walletShort: string): number {
   const info = larvaProcesses.get(walletShort);
   return info?.port || 4000;
 }
 
-// GET /api/larva/:wallet/status
+// GET /api/larva/:wallet/status — verify process is actually alive
 app.get("/api/larva/:wallet/status", (req, res) => {
   const walletShort = req.params.wallet.toLowerCase().slice(0, 8);
   const info = larvaProcesses.get(walletShort);
   
   if (info) {
-    res.json({ running: true, port: info.port });
+    // Health check the larva
+    fetch(`http://localhost:${info.port}/health`).then(r => r.json()).then(data => {
+      res.json({ running: true, port: info.port, messages: data.messages });
+    }).catch(() => {
+      // Process exists in map but isn't responding — clean up
+      larvaProcesses.delete(walletShort);
+      res.json({ running: false });
+    });
   } else {
     res.json({ running: false });
   }
@@ -272,49 +288,37 @@ app.post("/api/larva/:wallet/launch", async (req, res) => {
   const walletShort = wallet.slice(0, 8);
   
   if (larvaProcesses.has(walletShort)) {
-    return res.json({ message: "Larva already running", running: true });
+    // Verify it's still alive
+    try {
+      await fetch(`http://localhost:${larvaProcesses.get(walletShort)!.port}/health`);
+      return res.json({ message: "Larva already running", running: true });
+    } catch {
+      larvaProcesses.delete(walletShort);
+    }
   }
   
   const port = nextLarvaPort++;
   
   try {
-    // Try Docker first
-    const larvaDir = path.join(__dirname, "larva");
+    const child = spawn("node", [path.join(__dirname, "larva", "server.js")], {
+      env: { ...process.env, PORT: String(port), WALLET: wallet, ANTHROPIC_API_KEY },
+      stdio: "pipe",
+    });
     
-    try {
-      execSync(`docker build -t clawdviction-larva ${larvaDir}`, { stdio: "pipe" });
-      const containerName = `larva-${walletShort}`;
-      
-      // Remove existing container if any
-      try { execSync(`docker rm -f ${containerName}`, { stdio: "pipe" }); } catch {}
-      
-      const result = execSync(
-        `docker run -d --name ${containerName} -p ${port}:3000 -e WALLET=${wallet} clawdviction-larva`,
-        { encoding: "utf-8" }
-      ).trim();
-      
-      larvaProcesses.set(walletShort, { port, containerId: result });
-      console.log(`🦞 Launched larva container ${containerName} on port ${port}`);
-    } catch {
-      // Fallback: run Node.js process directly
-      console.log("Docker not available, running larva as subprocess...");
-      const child = spawn("node", [path.join(__dirname, "larva", "server.js")], {
-        env: { ...process.env, PORT: String(port), WALLET: wallet },
-        stdio: "pipe",
-      });
-      
-      child.on("error", (e) => console.error(`Larva process error: ${e.message}`));
-      child.on("exit", () => {
-        larvaProcesses.delete(walletShort);
-        console.log(`🦞 Larva for ${walletShort} exited`);
-      });
-      
-      larvaProcesses.set(walletShort, { port });
-    }
+    child.stdout?.on("data", (d: Buffer) => console.log(`[larva-${walletShort}] ${d.toString().trim()}`));
+    child.stderr?.on("data", (d: Buffer) => console.error(`[larva-${walletShort}] ${d.toString().trim()}`));
+    child.on("error", (e: Error) => console.error(`Larva process error: ${e.message}`));
+    child.on("exit", () => {
+      larvaProcesses.delete(walletShort);
+      console.log(`🦞 Larva for ${walletShort} exited`);
+    });
     
-    // Wait a moment for startup
+    larvaProcesses.set(walletShort, { port, child });
+    
+    // Wait for startup
     await new Promise(r => setTimeout(r, 1500));
     
+    console.log(`🦞 Launched larva for ${walletShort} on port ${port}`);
     res.json({ message: "Larva launched!", running: true, port });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
