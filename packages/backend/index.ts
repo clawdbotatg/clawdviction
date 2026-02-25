@@ -60,6 +60,15 @@ db.exec(`
     score TEXT NOT NULL DEFAULT '0'
   );
 
+  CREATE TABLE IF NOT EXISTS larva_seeds (
+    wallet TEXT PRIMARY KEY,
+    answers TEXT NOT NULL DEFAULT '{}',
+    identity_brief TEXT DEFAULT NULL,
+    completed INTEGER DEFAULT 0,
+    created_at INTEGER DEFAULT (unixepoch()),
+    updated_at INTEGER DEFAULT (unixepoch())
+  );
+
   CREATE TABLE IF NOT EXISTS chat_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     wallet TEXT NOT NULL,
@@ -229,6 +238,92 @@ app.get("/api/chat/history/:wallet", (req, res) => {
   res.json({ messages: history });
 });
 
+// GET /api/onboard/:wallet — get saved interview answers + brief
+app.get("/api/onboard/:wallet", (req, res) => {
+  const w = req.params.wallet.toLowerCase();
+  const seed = db.prepare("SELECT * FROM larva_seeds WHERE wallet = ?").get(w) as any;
+  if (!seed) return res.json({ completed: false, answers: {}, identity_brief: null });
+  res.json({
+    completed: !!seed.completed,
+    answers: JSON.parse(seed.answers || "{}"),
+    identity_brief: seed.identity_brief,
+  });
+});
+
+// POST /api/onboard/:wallet — save answers + generate identity brief
+app.post("/api/onboard/:wallet", async (req, res) => {
+  const w = req.params.wallet.toLowerCase();
+  const { answers } = req.body;
+  if (!answers) return res.status(400).json({ error: "answers required" });
+
+  // Generate identity brief via Sonnet (one-time, high stakes)
+  let identity_brief = null;
+  try {
+    const answerText = Object.entries(answers)
+      .map(([q, a]) => `Q: ${q}\nA: ${a}`)
+      .join("\n\n");
+
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-5",
+        max_tokens: 600,
+        system: `You are summarizing a $CLAWD token holder's onboarding interview into a compact identity brief.
+This brief will be injected into an AI governance agent's system prompt on EVERY conversation.
+Be specific and concrete. Use their actual words where possible. Under 500 tokens.
+
+Format:
+Name/handle: [name or "anonymous"]
+Background: [1 sentence on who they are in crypto]
+Why CLAWD: [their actual reason]
+
+Holder value thesis:
+  What they want holding to mean: [answer]
+
+Economic philosophy:
+  Burn/return preference: [e.g., "70 returned / 30 burned on 30-day lockup"]
+  Philosophy: [deflationary maximalist / utility maximalist / balanced]
+  Revenue view: [burns are enough / needs visible revenue / other]
+
+Build priorities:
+  Excited about: [list]
+  Would oppose: [list]
+
+AI thesis confidence: [high / medium / skeptical]
+  What would confirm it: [answer]
+
+Risk tolerance: [X/5 — brief explanation]
+
+Hard lines (instant NO):
+  - [list]
+
+Magic wand: "[verbatim quote]"
+
+Biggest concern: [answer]`,
+        messages: [{ role: "user", content: `Wallet: ${w}\n\n${answerText}` }],
+      }),
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      identity_brief = data.content?.[0]?.text || null;
+    }
+  } catch (e: any) {
+    console.error("Brief generation error:", e.message);
+  }
+
+  db.prepare(`
+    INSERT OR REPLACE INTO larva_seeds (wallet, answers, identity_brief, completed, updated_at)
+    VALUES (?, ?, ?, 1, unixepoch())
+  `).run(w, JSON.stringify(answers), identity_brief);
+
+  res.json({ ok: true, identity_brief });
+});
+
 // POST /api/chat — calls Anthropic directly with full DB history (persistent memory)
 app.post("/api/chat", async (req, res) => {
   const { wallet, message } = req.body;
@@ -248,6 +343,12 @@ app.post("/api/chat", async (req, res) => {
     "SELECT role, content FROM chat_messages WHERE wallet = ? ORDER BY created_at ASC LIMIT 50"
   ).all(w) as { role: string; content: string }[];
 
+  // Load identity brief if the holder completed onboarding
+  const seed = db.prepare("SELECT identity_brief FROM larva_seeds WHERE wallet = ? AND completed = 1").get(w) as any;
+  const systemPrompt = seed?.identity_brief
+    ? `${LARVA_SYSTEM_PROMPT(w)}\n\n---\n## What you know about this holder:\n${seed.identity_brief}`
+    : LARVA_SYSTEM_PROMPT(w);
+
   // Call Anthropic directly with persistent history
   try {
     const resp = await fetch("https://api.anthropic.com/v1/messages", {
@@ -260,7 +361,7 @@ app.post("/api/chat", async (req, res) => {
       body: JSON.stringify({
         model: "claude-haiku-4-5",
         max_tokens: 400,
-        system: LARVA_SYSTEM_PROMPT(w),
+        system: systemPrompt,
         messages: history.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
       }),
     });
