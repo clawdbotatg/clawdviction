@@ -60,6 +60,13 @@ db.exec(`
     score TEXT NOT NULL DEFAULT '0'
   );
 
+  CREATE TABLE IF NOT EXISTS memory_snapshots (
+    wallet TEXT PRIMARY KEY,
+    snapshot TEXT NOT NULL,
+    message_count INTEGER DEFAULT 0,
+    updated_at INTEGER DEFAULT (unixepoch())
+  );
+
   CREATE TABLE IF NOT EXISTS larva_seeds (
     wallet TEXT PRIMARY KEY,
     answers TEXT NOT NULL DEFAULT '{}',
@@ -229,6 +236,54 @@ Personality:
 Keep responses concise (2-4 sentences). You're chatting, not writing essays.
 This conversation persists — you remember everything across sessions.`;
 
+// --- Memory Compression ---
+async function compressMemory(wallet: string): Promise<void> {
+  // Get all messages except last 20 (those stay raw)
+  const allMsgs = db.prepare(
+    "SELECT id, role, content FROM chat_messages WHERE wallet = ? ORDER BY created_at ASC"
+  ).all(wallet) as { id: number; role: string; content: string }[];
+
+  if (allMsgs.length <= 30) return; // not worth compressing yet
+
+  const toCompress = allMsgs.slice(0, allMsgs.length - 20);
+  const existing = db.prepare("SELECT snapshot FROM memory_snapshots WHERE wallet = ?").get(wallet) as any;
+
+  const priorContext = existing ? `Prior summary:\n${existing.snapshot}\n\nAdditional conversation:\n` : "";
+  const msgText = toCompress.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n");
+
+  try {
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5",
+        max_tokens: 500,
+        system: `Summarize this governance larva conversation into a compact memory snapshot under 400 tokens.
+Capture: holder's name, key values, governance positions, things they care about, open threads.
+This replaces raw history — preserve everything needed to represent this person accurately.`,
+        messages: [{ role: "user", content: `${priorContext}${msgText}` }],
+      }),
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const snapshot = data.content?.[0]?.text;
+    if (!snapshot) return;
+
+    db.prepare(`
+      INSERT OR REPLACE INTO memory_snapshots (wallet, snapshot, message_count, updated_at)
+      VALUES (?, ?, ?, unixepoch())
+    `).run(wallet, snapshot, allMsgs.length);
+
+    console.log(`🧠 Compressed memory for ${wallet.slice(0, 8)}... (${toCompress.length} messages → snapshot)`);
+  } catch (e: any) {
+    console.error("Compression error:", e.message);
+  }
+}
+
 // GET /api/chat/history/:wallet — load conversation history
 app.get("/api/chat/history/:wallet", (req, res) => {
   const w = req.params.wallet.toLowerCase();
@@ -338,16 +393,35 @@ app.post("/api/chat", async (req, res) => {
     "INSERT INTO chat_messages (wallet, role, content) VALUES (?, ?, ?)"
   ).run(w, "user", message);
 
-  // Load full conversation history from DB (last 50 messages)
-  const history = db.prepare(
-    "SELECT role, content FROM chat_messages WHERE wallet = ? ORDER BY created_at ASC LIMIT 50"
-  ).all(w) as { role: string; content: string }[];
-
   // Load identity brief if the holder completed onboarding
   const seed = db.prepare("SELECT identity_brief FROM larva_seeds WHERE wallet = ? AND completed = 1").get(w) as any;
   const systemPrompt = seed?.identity_brief
     ? `${LARVA_SYSTEM_PROMPT(w)}\n\n---\n## What you know about this holder:\n${seed.identity_brief}`
     : LARVA_SYSTEM_PROMPT(w);
+
+  // Rolling window: load last 30 messages for context (full history stays in DB)
+  // If a memory snapshot exists, prepend it and only send last 20 raw messages
+  const snapshot = db.prepare(
+    "SELECT snapshot FROM memory_snapshots WHERE wallet = ?"
+  ).get(w) as any;
+
+  const rawLimit = snapshot ? 20 : 30;
+  const history = db.prepare(
+    `SELECT role, content FROM chat_messages WHERE wallet = ? ORDER BY created_at DESC LIMIT ${rawLimit}`
+  ).all(w).reverse() as { role: string; content: string }[];
+
+  // Inject snapshot as a system note before recent messages
+  const contextMessages = snapshot
+    ? [{ role: "user" as const, content: `[Memory summary from earlier in our conversation: ${snapshot.snapshot}]` },
+       { role: "assistant" as const, content: "Understood — I have that context." },
+       ...history]
+    : history;
+
+  // Trigger background compression when history gets long (every 40 messages)
+  const msgCount = (db.prepare("SELECT COUNT(*) as c FROM chat_messages WHERE wallet = ?").get(w) as any)?.c ?? 0;
+  if (msgCount > 0 && msgCount % 40 === 0) {
+    compressMemory(w).catch(() => {}); // fire-and-forget
+  }
 
   // Call Anthropic directly with persistent history
   try {
@@ -362,7 +436,7 @@ app.post("/api/chat", async (req, res) => {
         model: "claude-haiku-4-5",
         max_tokens: 400,
         system: systemPrompt,
-        messages: history.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
+        messages: contextMessages,
       }),
     });
 
