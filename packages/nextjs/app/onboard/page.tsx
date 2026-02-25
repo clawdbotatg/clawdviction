@@ -229,17 +229,17 @@ const OnboardPage: NextPage = () => {
         </p>
 
         {brief && (
-          <div className="w-full bg-base-200 rounded-xl p-5 mb-6 text-sm font-mono whitespace-pre-wrap text-base-content/80">
+          <div className="w-full bg-base-200 rounded-none p-5 mb-6 text-sm font-mono whitespace-pre-wrap text-base-content/80">
             {brief}
           </div>
         )}
 
         <div className="flex gap-3">
-          <Link href="/chat" className="btn btn-primary">
+          <Link href="/chat" className="btn btn-primary [border-radius:0]">
             Talk to Your Larva 🦞
           </Link>
           <button
-            className="btn btn-outline btn-sm"
+            className="btn btn-outline btn-sm [border-radius:0]"
             onClick={() => {
               setDone(false);
               setAlreadyCompleted(false);
@@ -263,7 +263,7 @@ const OnboardPage: NextPage = () => {
           </span>
           <span className="text-sm text-base-content/50">{Math.round(progress)}% complete</span>
         </div>
-        <progress className="progress progress-primary w-full h-2" value={progress} max="100" />
+        <progress className="progress progress-primary rounded-none w-full h-2" value={progress} max="100" />
       </div>
 
       {/* Question */}
@@ -274,7 +274,7 @@ const OnboardPage: NextPage = () => {
         {/* Text area */}
         {currentQ.type === "textarea" && (
           <textarea
-            className="textarea textarea-bordered w-full h-36 text-base"
+            className="textarea textarea-bordered rounded-none [border-radius:0] w-full h-36 text-base"
             placeholder={currentQ.placeholder}
             value={answers[currentQ.id] ?? ""}
             onChange={e => setAnswer(e.target.value)}
@@ -287,7 +287,7 @@ const OnboardPage: NextPage = () => {
             {currentQ.options?.map(opt => (
               <label
                 key={opt.value}
-                className="flex items-center gap-3 cursor-pointer p-3 rounded-lg border border-base-300 hover:bg-base-200 transition-colors"
+                className="flex items-center gap-3 cursor-pointer p-3 rounded-none border border-base-300 hover:bg-base-200 transition-colors"
               >
                 <input
                   type="radio"
@@ -309,7 +309,7 @@ const OnboardPage: NextPage = () => {
             {currentQ.options?.map(opt => (
               <label
                 key={opt.value}
-                className="flex items-center gap-3 cursor-pointer p-3 rounded-lg border border-base-300 hover:bg-base-200 transition-colors"
+                className="flex items-center gap-3 cursor-pointer p-3 rounded-none border border-base-300 hover:bg-base-200 transition-colors"
               >
                 <input
                   type="checkbox"
@@ -324,7 +324,7 @@ const OnboardPage: NextPage = () => {
               <div className="mt-4">
                 <p className="text-sm text-base-content/60 mb-2">{currentQ.subPrompt}</p>
                 <textarea
-                  className="textarea textarea-bordered w-full h-24 text-base"
+                  className="textarea textarea-bordered rounded-none [border-radius:0] w-full h-24 text-base"
                   placeholder={currentQ.subPlaceholder}
                   value={answers[`${currentQ.id}_notes`] ?? ""}
                   onChange={e => setAnswers(prev => ({ ...prev, [`${currentQ.id}_notes`]: e.target.value }))}
@@ -346,7 +346,7 @@ const OnboardPage: NextPage = () => {
                 <button
                   key={n}
                   onClick={() => setAnswer(String(n))}
-                  className={`btn btn-circle btn-lg text-xl font-bold ${
+                  className={`btn btn-lg [border-radius:0] text-xl font-bold ${
                     (scaleValues[currentQ.id] ?? 0) === n ? "btn-primary" : "btn-outline"
                   }`}
                 >
@@ -358,7 +358,7 @@ const OnboardPage: NextPage = () => {
               <div className="mt-5">
                 <p className="text-sm text-base-content/60 mb-2">{currentQ.subPrompt}</p>
                 <textarea
-                  className="textarea textarea-bordered w-full h-28 text-base"
+                  className="textarea textarea-bordered rounded-none [border-radius:0] w-full h-28 text-base"
                   placeholder={currentQ.subPlaceholder}
                   value={answers[`${currentQ.id}_notes`] ?? ""}
                   onChange={e => setAnswers(prev => ({ ...prev, [`${currentQ.id}_notes`]: e.target.value }))}
@@ -371,20 +371,20 @@ const OnboardPage: NextPage = () => {
 
       {/* Nav */}
       <div className="sticky bottom-0 bg-base-100 pt-4 pb-6 flex items-center justify-between gap-3">
-        <button className="btn btn-ghost" onClick={handleBack} disabled={step === 0}>
+        <button className="btn btn-ghost [border-radius:0]" onClick={handleBack} disabled={step === 0}>
           ← Back
         </button>
 
-        <button className="btn btn-ghost btn-sm text-base-content/40" onClick={handleNext}>
+        <button className="btn btn-ghost btn-sm [border-radius:0] text-base-content/40" onClick={handleNext}>
           Skip
         </button>
 
         {step < QUESTIONS.length - 1 ? (
-          <button className="btn btn-primary" onClick={handleNext}>
+          <button className="btn btn-primary [border-radius:0]" onClick={handleNext}>
             Next →
           </button>
         ) : (
-          <button className="btn btn-primary btn-lg" onClick={handleSubmit} disabled={submitting}>
+          <button className="btn btn-primary btn-lg [border-radius:0]" onClick={handleSubmit} disabled={submitting}>
             {submitting ? (
               <>
                 <span className="loading loading-spinner loading-sm" />
