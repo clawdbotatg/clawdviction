@@ -94,7 +94,6 @@ export const Header = () => {
         </details>
         <Link href="/" passHref className="hidden lg:flex items-center gap-2 ml-4 mr-6 shrink-0">
           <Image src="/logo.jpg" alt="ClawdViction" width={40} height={40} className="rounded-full" />
-          <span className="font-bold leading-tight">ClawdViction</span>
         </Link>
         <ul className="hidden lg:flex lg:flex-nowrap menu menu-horizontal px-1 gap-2">
           <HeaderMenuLinks />
