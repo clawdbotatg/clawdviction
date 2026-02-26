@@ -103,7 +103,16 @@
 
 :root,
 [data-theme] {
-  background: var(--color-base-200);
+  background: transparent;
+}
+
+html {
+  background-image: url('/bg.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  min-height: 100%;
 }
 
 .btn {
