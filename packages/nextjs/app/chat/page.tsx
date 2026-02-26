@@ -29,7 +29,10 @@ const ChatPage: NextPage = () => {
   const loadHistory = useCallback(async () => {
     if (!address) return;
     try {
-      const res = await fetch(`${BACKEND_URL}/api/chat/history/${address}`);
+      const historyUrl = BACKEND_URL
+        ? `${BACKEND_URL}/api/chat/history/${address}`
+        : `/api/chat/history/${address}`;
+      const res = await fetch(historyUrl);
       const data = await res.json();
       if (data.messages?.length > 0) {
         setMessages(data.messages as Message[]);
@@ -97,24 +100,13 @@ const ChatPage: NextPage = () => {
     setLoading(true);
 
     try {
-      let data;
-      try {
-        // Backend: handles its own history via SQLite — just send wallet + message
-        const res = await fetch(`${BACKEND_URL}/api/chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ wallet: address, message: userMessage, identityBrief }),
-        });
-        data = await res.json();
-      } catch {
-        // Next.js fallback: send full message history for session continuity
-        const res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ wallet: address, message: userMessage, messages: updatedMessages, identityBrief }),
-        });
-        data = await res.json();
-      }
+      const chatUrl = BACKEND_URL ? `${BACKEND_URL}/api/chat` : "/api/chat";
+      const res = await fetch(chatUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wallet: address, message: userMessage, identityBrief }),
+      });
+      const data = await res.json();
       if (data.message) {
         setMessages(prev => [...prev, { role: "assistant", content: data.message }]);
       }
