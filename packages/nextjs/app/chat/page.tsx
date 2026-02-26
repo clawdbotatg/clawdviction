@@ -154,7 +154,7 @@ const ChatPage: NextPage = () => {
   return (
     <div className="flex flex-col flex-grow pt-6 px-5 max-w-3xl mx-auto w-full">
       {!larvaRunning ? (
-        <div className="text-center py-20">
+        <div className="bg-base-100/60 backdrop-blur-sm rounded-2xl px-8 py-16 text-center">
           <div className="text-6xl mb-4">🦞</div>
           <h2 className="text-2xl font-bold mb-2">Your Larva is Ready to Hatch</h2>
           <p className="text-base-content/60 mb-6">Launch your personal AI governance agent.</p>
@@ -169,12 +169,15 @@ const ChatPage: NextPage = () => {
           </button>
         </div>
       ) : (
-        <>
-          <div className="alert alert-info mb-4">
-            <span>🦀 Your larva is alive! Teach it your values — it&apos;ll represent you in governance.</span>
+        <div
+          className="bg-base-100/70 backdrop-blur-sm rounded-2xl flex flex-col overflow-hidden"
+          style={{ minHeight: "70vh" }}
+        >
+          <div className="px-4 pt-4 pb-2 border-b border-base-300">
+            <span className="text-sm text-base-content/60">🦀 Your larva is alive — teach it your values.</span>
           </div>
 
-          <div className="flex-1 overflow-y-auto space-y-4 pb-4 min-h-[50vh]">
+          <div className="flex-1 overflow-y-auto space-y-3 p-4 min-h-0">
             {messages.length === 0 && (
               <div className="text-center text-base-content/40 mt-20">
                 <div className="text-4xl mb-3">🦞</div>
@@ -182,16 +185,23 @@ const ChatPage: NextPage = () => {
               </div>
             )}
             {messages.map((msg, i) => (
-              <div key={i} className={`chat ${msg.role === "user" ? "chat-end" : "chat-start"}`}>
-                <div className="chat-header">{msg.role === "assistant" ? "🦀 Larva" : "You"}</div>
-                <div className={`chat-bubble ${msg.role === "user" ? "chat-bubble-primary" : "chat-bubble-secondary"}`}>
+              <div key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
+                <span className="text-xs text-base-content/40 mb-1 px-1">
+                  {msg.role === "assistant" ? "🦀 Larva" : "You"}
+                </span>
+                <div
+                  className={`max-w-[75%] px-4 py-2 rounded-lg text-sm break-words ${
+                    msg.role === "user" ? "bg-primary text-primary-content" : "bg-base-200 text-base-content"
+                  }`}
+                >
                   {msg.content}
                 </div>
               </div>
             ))}
             {loading && (
-              <div className="chat chat-start">
-                <div className="chat-bubble chat-bubble-secondary">
+              <div className="flex flex-col items-start">
+                <span className="text-xs text-base-content/40 mb-1 px-1">🦀 Larva</span>
+                <div className="bg-base-200 rounded-lg px-4 py-2">
                   <span className="loading loading-dots loading-sm"></span>
                 </div>
               </div>
@@ -199,7 +209,7 @@ const ChatPage: NextPage = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="sticky bottom-0 bg-base-100 pt-4 pb-6">
+          <div className="border-t border-base-300 px-4 pt-3 pb-4">
             <div className="flex gap-2">
               <input
                 type="text"
@@ -214,7 +224,7 @@ const ChatPage: NextPage = () => {
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
