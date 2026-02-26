@@ -149,8 +149,10 @@ const StakePage: NextPage = () => {
 
   // Handlers
   const openWalletDeepLink = () => {
-    if (!window.ethereum) {
-      window.location.href = "wc://";
+    // Only attempt deep link on mobile when no injected provider
+    if (typeof window !== "undefined" && !window.ethereum && /iPhone|iPad|Android/i.test(navigator.userAgent)) {
+      // Use MetaMask universal link as primary, with WalletConnect as fallback
+      window.location.href = `https://metamask.app.link/dapp/${window.location.host}`;
     }
   };
 
@@ -160,7 +162,7 @@ const StakePage: NextPage = () => {
       functionName: "approve",
       args: [stakingContractData.address, parsedAmount],
     });
-    setTimeout(openWalletDeepLink, 1500);
+    setTimeout(openWalletDeepLink, 2000);
   };
 
   const handleStake = async () => {
@@ -170,7 +172,7 @@ const StakePage: NextPage = () => {
       args: [parsedAmount],
     });
     setStakeAmount("");
-    setTimeout(openWalletDeepLink, 1500);
+    setTimeout(openWalletDeepLink, 2000);
   };
 
   const handleUnstake = async (index: number) => {

@@ -23,3 +23,10 @@ node_modules
 dist
 packages/backend/clawdviction.db*
 packages/nextjs/.env.local
+
+# Foundry
+packages/foundry/out/
+packages/foundry/cache/
+packages/foundry/.gitmodules
+packages/foundry/foundry.lock
+packages/foundry/lib/

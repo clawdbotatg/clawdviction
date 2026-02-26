@@ -1,0 +1,9 @@
+[profile.default]
+src = "contracts"
+test = "test"
+script = "script"
+libs = ["lib", "../hardhat/node_modules"]
+remappings = [
+    "@openzeppelin/=../hardhat/node_modules/@openzeppelin/",
+    "forge-std/=lib/forge-std/src/"
+]
