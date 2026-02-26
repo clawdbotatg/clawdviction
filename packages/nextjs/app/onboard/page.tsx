@@ -210,12 +210,12 @@ const OnboardPage: NextPage = () => {
     return (
       <div className="flex flex-col items-center flex-grow pt-20 px-5">
         <div className="text-6xl mb-4">🦞</div>
-        <h2 className="text-2xl font-bold mb-2">Meet Your Larva</h2>
+        <RainbowKitCustomConnectButton />
+        <h2 className="text-2xl font-bold mt-6 mb-2">Meet Your Larva</h2>
         <p className="text-base-content/60 mb-6 text-center max-w-md">
           Connect your wallet to start the onboarding interview. This helps your larva understand who you are before you
           ever say a word.
         </p>
-        <RainbowKitCustomConnectButton />
       </div>
     );
   }

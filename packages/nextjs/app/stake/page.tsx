@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useFetchNativeCurrencyPrice } from "@scaffold-ui/hooks";
 import type { NextPage } from "next";
 import { formatEther, parseEther } from "viem";
-import { useAccount } from "wagmi";
+import { useAccount, useReadContract } from "wagmi";
 import { Address, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import {
   useDeployedContractInfo,
@@ -13,6 +14,33 @@ import {
 } from "~~/hooks/scaffold-eth";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "";
+
+const CLAWD_ETH_POOL = "0xCD55381a53da35Ab1D7Bc5e3fE5F76cac976FAc3" as const;
+const WETH_BASE = "0x4200000000000000000000000000000000000006";
+const POOL_ABI = [
+  {
+    inputs: [],
+    name: "slot0",
+    outputs: [
+      { internalType: "uint160", name: "sqrtPriceX96", type: "uint160" },
+      { internalType: "int24", name: "tick", type: "int24" },
+      { internalType: "uint16", name: "observationIndex", type: "uint16" },
+      { internalType: "uint16", name: "observationCardinality", type: "uint16" },
+      { internalType: "uint16", name: "observationCardinalityNext", type: "uint16" },
+      { internalType: "uint8", name: "feeProtocol", type: "uint8" },
+      { internalType: "bool", name: "unlocked", type: "bool" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "token0",
+    outputs: [{ internalType: "address", name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
 
 const StakePage: NextPage = () => {
   const { address: connectedAddress, chain } = useAccount();
@@ -59,6 +87,25 @@ const StakePage: NextPage = () => {
     watch: true,
   });
 
+  // CLAWD/ETH Uniswap V3 price
+  const { price: ethPrice } = useFetchNativeCurrencyPrice();
+  const { data: slot0Data } = useReadContract({ address: CLAWD_ETH_POOL, abi: POOL_ABI, functionName: "slot0" });
+  const { data: token0Data } = useReadContract({ address: CLAWD_ETH_POOL, abi: POOL_ABI, functionName: "token0" });
+
+  const clawdUsdPrice = useMemo(() => {
+    try {
+      if (!slot0Data || !token0Data || !ethPrice) return null;
+      const sqrtPriceX96 = slot0Data[0];
+      const sqrtPrice = Number(sqrtPriceX96) / 2 ** 96;
+      const priceToken1PerToken0 = sqrtPrice * sqrtPrice;
+      const isWethToken0 = token0Data.toLowerCase() === WETH_BASE.toLowerCase();
+      const clawdInEth = isWethToken0 ? 1 / priceToken1PerToken0 : priceToken1PerToken0;
+      return clawdInEth * ethPrice;
+    } catch {
+      return null;
+    }
+  }, [slot0Data, token0Data, ethPrice]);
+
   // Write hooks - SEPARATE for each action
   const { writeContractAsync: approveWrite, isMining: isApproving } = useScaffoldWriteContract("MockCLAWD");
   const { writeContractAsync: stakeWrite, isMining: isStaking } = useScaffoldWriteContract("ClawdVictionStaking");
@@ -101,12 +148,19 @@ const StakePage: NextPage = () => {
   };
 
   // Handlers
+  const openWalletDeepLink = () => {
+    if (!window.ethereum) {
+      window.location.href = "wc://";
+    }
+  };
+
   const handleApprove = async () => {
     if (!stakingContractData?.address || parsedAmount <= 0n) return;
     await approveWrite({
       functionName: "approve",
       args: [stakingContractData.address, parsedAmount],
     });
+    setTimeout(openWalletDeepLink, 1500);
   };
 
   const handleStake = async () => {
@@ -116,6 +170,7 @@ const StakePage: NextPage = () => {
       args: [parsedAmount],
     });
     setStakeAmount("");
+    setTimeout(openWalletDeepLink, 1500);
   };
 
   const handleUnstake = async (index: number) => {
@@ -145,8 +200,8 @@ const StakePage: NextPage = () => {
     return (
       <div className="flex items-center flex-col flex-grow pt-20">
         <div className="text-6xl mb-4">🦀</div>
-        <p className="text-base-content/60 mb-6">Connect your wallet to start staking $CLAWD</p>
         <RainbowKitCustomConnectButton />
+        <p className="text-base-content/60 mt-6">Connect your wallet to start staking $CLAWD</p>
       </div>
     );
   }
@@ -162,6 +217,14 @@ const StakePage: NextPage = () => {
           <div className="stat-value text-error text-2xl">
             {totalStaked ? Number(formatEther(totalStaked)).toLocaleString() : "0"} CLAWD
           </div>
+          {clawdUsdPrice && totalStaked && totalStaked > 0n && (
+            <div className="stat-desc">
+              $
+              {(Number(formatEther(totalStaked)) * clawdUsdPrice).toLocaleString(undefined, {
+                maximumFractionDigits: 2,
+              })}
+            </div>
+          )}
         </div>
         <div className="stat bg-base-200 rounded-xl shadow">
           <div className="stat-title">Your ClawdViction</div>
@@ -181,6 +244,9 @@ const StakePage: NextPage = () => {
           <h2 className="card-title">Stake Tokens</h2>
           <p className="text-sm text-base-content/60 mb-4">
             Balance: {clawdBalance ? Number(formatEther(clawdBalance)).toLocaleString() : "0"} CLAWD
+            {clawdUsdPrice && clawdBalance && clawdBalance > 0n && (
+              <span className="ml-1">(${(Number(formatEther(clawdBalance)) * clawdUsdPrice).toFixed(2)})</span>
+            )}
           </p>
 
           <input

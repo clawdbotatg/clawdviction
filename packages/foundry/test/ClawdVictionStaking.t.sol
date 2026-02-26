@@ -37,7 +37,7 @@ contract ClawdVictionStakingTest is Test {
         // Fast forward 1 hour
         vm.warp(block.timestamp + 3600);
 
-        uint256 conviction = staking.getConviction(alice);
+        uint256 conviction = staking.getClawdviction(alice);
         assertEq(conviction, 1000 ether * 3600);
     }
 
@@ -74,7 +74,7 @@ contract ClawdVictionStakingTest is Test {
 
         // First stake: 1000 * 7200 = 7,200,000
         // Second stake: 1000 * 3600 = 3,600,000
-        uint256 conviction = staking.getConviction(alice);
+        uint256 conviction = staking.getClawdviction(alice);
         assertEq(conviction, 1000 ether * 7200 + 1000 ether * 3600);
     }
 }

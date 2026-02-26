@@ -22,6 +22,11 @@ contract ClawdVictionStaking is Ownable {
     mapping(address => uint256) public totalStaked;
     uint256 public totalSupplyStaked;
 
+    // O(1) clawdviction tracking
+    mapping(address => uint256) public clawdvictionAccrued;
+    mapping(address => uint256) public weightedStakeSum;
+    mapping(address => uint256) public totalActiveStaked;
+
     event Staked(address indexed user, uint256 amount, uint256 stakeIndex);
     event Unstaked(address indexed user, uint256 amount, uint256 stakeIndex, uint256 clawdviction);
 
@@ -36,6 +41,8 @@ contract ClawdVictionStaking is Ownable {
         stakes[msg.sender].push(Stake({ amount: amount, stakedAt: block.timestamp }));
         totalStaked[msg.sender] += amount;
         totalSupplyStaked += amount;
+        totalActiveStaked[msg.sender] += amount;
+        weightedStakeSum[msg.sender] += amount * block.timestamp;
         emit Staked(msg.sender, amount, stakeIndex);
     }
 
@@ -44,7 +51,11 @@ contract ClawdVictionStaking is Ownable {
         Stake storage s = stakes[msg.sender][stakeIndex];
         require(s.amount > 0, "Already unstaked");
         uint256 amount = s.amount;
-        uint256 clawdviction = amount * (block.timestamp - s.stakedAt);
+        uint256 stakedAt = s.stakedAt;
+        uint256 clawdviction = amount * (block.timestamp - stakedAt);
+        clawdvictionAccrued[msg.sender] += clawdviction;
+        totalActiveStaked[msg.sender] -= amount;
+        weightedStakeSum[msg.sender] -= amount * stakedAt;
         s.amount = 0;
         totalStaked[msg.sender] -= amount;
         totalSupplyStaked -= amount;
@@ -60,13 +71,7 @@ contract ClawdVictionStaking is Ownable {
     }
 
     function getClawdviction(address user) public view returns (uint256) {
-        uint256 total = 0;
-        for (uint256 i = 0; i < stakes[user].length; i++) {
-            if (stakes[user][i].amount > 0) {
-                total += stakes[user][i].amount * (block.timestamp - stakes[user][i].stakedAt);
-            }
-        }
-        return total;
+        return clawdvictionAccrued[user] + totalActiveStaked[user] * block.timestamp - weightedStakeSum[user];
     }
 
     function getStakeCount(address user) external view returns (uint256) {

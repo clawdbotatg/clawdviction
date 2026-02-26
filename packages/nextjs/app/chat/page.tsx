@@ -130,8 +130,8 @@ const ChatPage: NextPage = () => {
     return (
       <div className="flex items-center flex-col flex-grow pt-20">
         <div className="text-6xl mb-4">🦀</div>
-        <p className="text-base-content/60 mb-6">Connect your wallet to meet your larva.</p>
         <RainbowKitCustomConnectButton />
+        <p className="text-base-content/60 mt-6">Connect your wallet to meet your larva.</p>
       </div>
     );
   }
