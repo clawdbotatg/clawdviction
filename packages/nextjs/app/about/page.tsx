@@ -6,7 +6,7 @@ import type { NextPage } from "next";
 const AboutPage: NextPage = () => {
   return (
     <div className="flex flex-col items-center flex-grow pt-10 px-5">
-      <div className="max-w-2xl">
+      <div className="max-w-2xl bg-base-100/60 backdrop-blur-sm rounded-2xl px-8 py-6">
         <h1 className="text-3xl font-bold mb-6">
           <span className="bg-gradient-to-r from-red-500 to-red-300 bg-clip-text text-transparent">
             About ClawdViction
@@ -28,14 +28,15 @@ const AboutPage: NextPage = () => {
           </p>
 
           <p>
-            The core insight: <strong>democracy and DAOs fail because humans don&apos;t have the
-            attention bandwidth.</strong> There are too many decisions, too many domains, and nobody
-            has time to be informed on everything. Delegation just creates mini-oligarchies.
+            The core insight:{" "}
+            <strong>democracy and DAOs fail because humans don&apos;t have the attention bandwidth.</strong> There are
+            too many decisions, too many domains, and nobody has time to be informed on everything. Delegation just
+            creates mini-oligarchies.
           </p>
 
           <p>
-            The fix: <strong>personal AI agents that vote based on your values.</strong> Your AI
-            represents you in governance — and only bugs you when it&apos;s unsure.
+            The fix: <strong>personal AI agents that vote based on your values.</strong> Your AI represents you in
+            governance — and only bugs you when it&apos;s unsure.
           </p>
 
           <div className="card bg-base-200 shadow-lg my-8">
@@ -43,28 +44,33 @@ const AboutPage: NextPage = () => {
               <h2 className="card-title">How It Works</h2>
               <ol className="space-y-2">
                 <li>
-                  <strong className="text-error">1.</strong> <strong>Stake $CLAWD</strong> — lock tokens into the staking contract
+                  <strong className="text-error">1.</strong> <strong>Stake $CLAWD</strong> — lock tokens into the
+                  staking contract
                 </li>
                 <li>
-                  <strong className="text-error">2.</strong> <strong>Get a Larva</strong> — your persistent personal AI agent
+                  <strong className="text-error">2.</strong> <strong>Get a Larva</strong> — your persistent personal AI
+                  agent
                 </li>
                 <li>
-                  <strong className="text-error">3.</strong> <strong>Train it</strong> — through conversation, your larva learns your values
+                  <strong className="text-error">3.</strong> <strong>Train it</strong> — through conversation, your
+                  larva learns your values
                 </li>
                 <li>
-                  <strong className="text-error">4.</strong> <strong>Earn ClawdViction</strong> — governance weight grows over time (stake × duration)
+                  <strong className="text-error">4.</strong> <strong>Earn ClawdViction</strong> — governance weight
+                  grows over time (stake × duration)
                 </li>
                 <li>
-                  <strong className="text-error">5.</strong> <strong>Govern</strong> — your larva debates and votes on your behalf
+                  <strong className="text-error">5.</strong> <strong>Govern</strong> — your larva debates and votes on
+                  your behalf
                 </li>
               </ol>
             </div>
           </div>
 
           <p>
-            This isn&apos;t just token voting. It&apos;s <strong>AI-mediated deliberation</strong> —
-            the larvae actually discuss tradeoffs, surface objections, and find consensus, informed
-            by the diverse preferences of the entire holder base.
+            This isn&apos;t just token voting. It&apos;s <strong>AI-mediated deliberation</strong> — the larvae actually
+            discuss tradeoffs, surface objections, and find consensus, informed by the diverse preferences of the entire
+            holder base.
           </p>
         </div>
 

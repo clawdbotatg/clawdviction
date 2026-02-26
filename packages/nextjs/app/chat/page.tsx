@@ -29,9 +29,7 @@ const ChatPage: NextPage = () => {
   const loadHistory = useCallback(async () => {
     if (!address) return;
     try {
-      const historyUrl = BACKEND_URL
-        ? `${BACKEND_URL}/api/chat/history/${address}`
-        : `/api/chat/history/${address}`;
+      const historyUrl = BACKEND_URL ? `${BACKEND_URL}/api/chat/history/${address}` : `/api/chat/history/${address}`;
       const res = await fetch(historyUrl);
       const data = await res.json();
       if (data.messages?.length > 0) {
@@ -123,7 +121,9 @@ const ChatPage: NextPage = () => {
       <div className="flex items-center flex-col flex-grow pt-20">
         <div className="text-6xl mb-4">🦀</div>
         <RainbowKitCustomConnectButton />
-        <p className="text-base-content/60 mt-6">Connect your wallet to meet your larva.</p>
+        <div className="bg-base-100/60 backdrop-blur-sm rounded-xl px-5 py-3 mt-6">
+          <p className="text-base-content/60">Connect your wallet to meet your larva.</p>
+        </div>
       </div>
     );
   }
@@ -134,10 +134,12 @@ const ChatPage: NextPage = () => {
     return (
       <div className="flex items-center flex-col flex-grow pt-20 px-5">
         <div className="text-6xl mb-4">🦞</div>
-        <h2 className="text-2xl font-bold mb-2">Earn More ClawdViction</h2>
-        <p className="text-base-content/60 mb-6 text-center max-w-md">
-          You need 1M clawdviction to unlock your personal larva. Stake $CLAWD and let it grow over time.
-        </p>
+        <div className="bg-base-100/60 backdrop-blur-sm rounded-xl px-6 py-4 mb-6 text-center max-w-md">
+          <h2 className="text-2xl font-bold mb-2">Earn More ClawdViction</h2>
+          <p className="text-base-content/60">
+            You need 1M clawdviction to unlock your personal larva. Stake $CLAWD and let it grow over time.
+          </p>
+        </div>
         <div className="w-full max-w-md mb-4">
           <progress className="progress progress-error w-full h-4" value={progress} max="100"></progress>
           <p className="text-sm text-center mt-1 text-base-content/50">{progress.toFixed(1)}% — keep staking!</p>

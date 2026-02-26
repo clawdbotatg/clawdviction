@@ -211,11 +211,13 @@ const OnboardPage: NextPage = () => {
       <div className="flex flex-col items-center flex-grow pt-20 px-5">
         <div className="text-6xl mb-4">🦞</div>
         <RainbowKitCustomConnectButton />
-        <h2 className="text-2xl font-bold mt-6 mb-2">Meet Your Larva</h2>
-        <p className="text-base-content/60 mb-6 text-center max-w-md">
-          Connect your wallet to start the onboarding interview. This helps your larva understand who you are before you
-          ever say a word.
-        </p>
+        <div className="bg-base-100/60 backdrop-blur-sm rounded-xl px-6 py-4 mt-6 text-center max-w-md">
+          <h2 className="text-2xl font-bold mb-2">Meet Your Larva</h2>
+          <p className="text-base-content/60">
+            Connect your wallet to start the onboarding interview. This helps your larva understand who you are before
+            you ever say a word.
+          </p>
+        </div>
       </div>
     );
   }
@@ -225,11 +227,13 @@ const OnboardPage: NextPage = () => {
     return (
       <div className="flex flex-col items-center flex-grow pt-10 px-5 max-w-2xl mx-auto w-full">
         <div className="text-6xl mb-4">🦀</div>
-        <h2 className="text-2xl font-bold mb-2">Your larva knows you now.</h2>
-        <p className="text-base-content/60 mb-6 text-center">
-          This brief will be injected into every conversation — your larva starts knowing who you are before you say a
-          word.
-        </p>
+        <div className="bg-base-100/60 backdrop-blur-sm rounded-xl px-6 py-4 mb-6 text-center">
+          <h2 className="text-2xl font-bold mb-2">Your larva knows you now.</h2>
+          <p className="text-base-content/60">
+            This brief will be injected into every conversation — your larva starts knowing who you are before you say a
+            word.
+          </p>
+        </div>
 
         {brief && (
           <div className="w-full bg-base-200 rounded-none p-5 mb-6 text-sm font-mono whitespace-pre-wrap text-base-content/80">
@@ -257,7 +261,7 @@ const OnboardPage: NextPage = () => {
   }
 
   return (
-    <div className="flex flex-col flex-grow pt-6 px-5 max-w-2xl mx-auto w-full">
+    <div className="flex flex-col flex-grow pt-6 px-5 max-w-2xl mx-auto w-full bg-base-100/60 backdrop-blur-sm rounded-2xl my-4 pb-6">
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">

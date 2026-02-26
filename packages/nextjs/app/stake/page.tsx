@@ -203,14 +203,18 @@ const StakePage: NextPage = () => {
       <div className="flex items-center flex-col flex-grow pt-20">
         <div className="text-6xl mb-4">🦀</div>
         <RainbowKitCustomConnectButton />
-        <p className="text-base-content/60 mt-6">Connect your wallet to start staking $CLAWD</p>
+        <div className="bg-base-100/60 backdrop-blur-sm rounded-xl px-5 py-3 mt-6">
+          <p className="text-base-content/60">Connect your wallet to start staking $CLAWD</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col items-center flex-grow pt-10 px-5">
-      <p className="text-base-content/60 mb-8">Earn clawdviction. Grow your governance power. 🦀</p>
+      <div className="bg-base-100/60 backdrop-blur-sm rounded-xl px-5 py-2 mb-8">
+        <p className="text-base-content/60">Earn clawdviction. Grow your governance power. 🦀</p>
+      </div>
 
       {/* Stats */}
       <div className="grid md:grid-cols-3 gap-4 w-full max-w-3xl mb-8">
