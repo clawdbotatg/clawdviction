@@ -377,7 +377,7 @@ const OnboardPage: NextPage = () => {
       </div>
 
       {/* Nav */}
-      <div className="sticky bottom-0 bg-base-100/80 backdrop-blur-sm mt-4 border-t border-base-300 pt-4 pb-2 flex items-center justify-between gap-3">
+      <div className="mt-8 pt-4 border-t border-base-300 flex items-center justify-between gap-3">
         <button className="btn btn-ghost [border-radius:0]" onClick={handleBack} disabled={step === 0}>
           ← Back
         </button>
