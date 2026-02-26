@@ -12,12 +12,7 @@ const Home: NextPage = () => {
     <div className="flex items-center flex-col flex-grow pt-10">
       {/* Hero */}
       <div className="px-5 text-center max-w-3xl">
-        <h1 className="text-center">
-          <span className="block text-6xl mb-4">🦀</span>
-          <span className="block text-5xl font-bold bg-gradient-to-r from-red-500 via-red-400 to-orange-400 bg-clip-text text-transparent">
-            ClawdViction
-          </span>
-        </h1>
+        <div className="text-6xl mb-4">🦀</div>
         <p className="text-xl mt-4 text-base-content/70">
           AI-powered conviction governance for $CLAWD holders.
           <br />
@@ -61,7 +56,8 @@ const Home: NextPage = () => {
             <div className="text-3xl">🗳️</div>
             <h2 className="card-title text-error">Govern Together</h2>
             <p className="text-base-content/60">
-              When proposals come up, your larva debates and votes for you — informed by everything you&apos;ve taught it.
+              When proposals come up, your larva debates and votes for you — informed by everything you&apos;ve taught
+              it.
             </p>
           </div>
         </div>
@@ -71,8 +67,8 @@ const Home: NextPage = () => {
       <div className="mt-16 px-5 text-center max-w-2xl mb-16">
         <h2 className="text-2xl font-bold">The Problem</h2>
         <p className="mt-4 text-base-content/60">
-          DAOs fail because nobody has time to be informed on everything. Delegation just creates mini-oligarchies.
-          What if you could train an AI to represent <em>your</em> values in every vote?
+          DAOs fail because nobody has time to be informed on everything. Delegation just creates mini-oligarchies. What
+          if you could train an AI to represent <em>your</em> values in every vote?
         </p>
         <Link href="/about" className="link link-error mt-4 inline-block">
           Read the full vision →
