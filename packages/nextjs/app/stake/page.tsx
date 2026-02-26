@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useFetchNativeCurrencyPrice } from "@scaffold-ui/hooks";
 import type { NextPage } from "next";
 import { formatEther, parseEther } from "viem";
@@ -243,6 +244,15 @@ const StakePage: NextPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Larva CTA — unlocks at 1M clawdviction */}
+      {BigInt(clawdvictionScore) >= 1_000_000n * 10n ** 18n && (
+        <div className="w-full max-w-lg my-4">
+          <Link href="/chat" className="btn btn-primary btn-lg w-full shadow-xl">
+            🦞 Train Your Larva
+          </Link>
+        </div>
+      )}
 
       {/* Staking Form */}
       <div className="card bg-base-200 shadow-lg w-full max-w-lg">
