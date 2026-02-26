@@ -45,7 +45,9 @@ export async function POST(request: NextRequest) {
         if (briefResult.rows.length > 0 && briefResult.rows[0].identity_brief) {
           briefFromDb = briefResult.rows[0].identity_brief;
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
 
       // Save user message to DB
       await sql`
@@ -77,9 +79,10 @@ export async function POST(request: NextRequest) {
       }
     } else {
       // Fallback: use client-passed messages
-      history = Array.isArray(clientMessages) && clientMessages.length > 0
-        ? clientMessages
-        : [{ role: "user", content: message }];
+      history =
+        Array.isArray(clientMessages) && clientMessages.length > 0
+          ? clientMessages
+          : [{ role: "user", content: message }];
     }
 
     const effectiveBrief = briefFromDb || identityBrief || null;
@@ -92,7 +95,7 @@ export async function POST(request: NextRequest) {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-6",
+        model: "claude-haiku-4-5",
         max_tokens: 400,
         system: LARVA_SYSTEM_PROMPT(wallet) + (effectiveBrief ? `\n\n${effectiveBrief}` : ""),
         messages: history,
