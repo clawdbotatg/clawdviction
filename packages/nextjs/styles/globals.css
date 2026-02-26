@@ -18,22 +18,25 @@
 @plugin "daisyui/theme" {
   name: "light";
 
-  --color-primary: #93bbfb;
-  --color-primary-content: #212638;
-  --color-secondary: #dae8ff;
-  --color-secondary-content: #212638;
-  --color-accent: #93bbfb;
-  --color-accent-content: #212638;
-  --color-neutral: #212638;
+  /* Lobster red — primary actions */
+  --color-primary: #8B1A1A;
+  --color-primary-content: #ffffff;
+  --color-secondary: #B02020;
+  --color-secondary-content: #ffffff;
+  --color-accent: #8B1A1A;
+  --color-accent-content: #ffffff;
+  --color-neutral: #1a0808;
   --color-neutral-content: #ffffff;
+  /* Warm off-white cards with a red tint */
   --color-base-100: #ffffff;
-  --color-base-200: #f4f8ff;
-  --color-base-300: #dae8ff;
-  --color-base-content: #212638;
-  --color-info: #93bbfb;
+  --color-base-200: #fdf0f0;
+  --color-base-300: #f5d0d0;
+  --color-base-content: #1a0808;
+  --color-info: #8B1A1A;
   --color-success: #34eeb6;
   --color-warning: #ffcf72;
-  --color-error: #ff8863;
+  /* Warm red-orange used for card titles, decorative text */
+  --color-error: #d94f1e;
 
   --radius-field: 9999rem;
   --radius-box: 1rem;
@@ -43,22 +46,24 @@
 @plugin "daisyui/theme" {
   name: "dark";
 
-  --color-primary: #212638;
-  --color-primary-content: #f9fbff;
-  --color-secondary: #323f61;
-  --color-secondary-content: #f9fbff;
-  --color-accent: #4969a6;
-  --color-accent-content: #f9fbff;
-  --color-neutral: #f9fbff;
-  --color-neutral-content: #385183;
-  --color-base-100: #385183;
-  --color-base-200: #2a3655;
-  --color-base-300: #212638;
-  --color-base-content: #f9fbff;
-  --color-info: #385183;
+  /* Lobster red on dark maroon */
+  --color-primary: #cc2b2b;
+  --color-primary-content: #ffffff;
+  --color-secondary: #7B1010;
+  --color-secondary-content: #f9eded;
+  --color-accent: #cc2b2b;
+  --color-accent-content: #ffffff;
+  --color-neutral: #f9eded;
+  --color-neutral-content: #7B1010;
+  /* Dark maroon backgrounds */
+  --color-base-100: #1e0a0a;
+  --color-base-200: #2d1212;
+  --color-base-300: #3d1818;
+  --color-base-content: #f9eded;
+  --color-info: #7B1010;
   --color-success: #34eeb6;
   --color-warning: #ffcf72;
-  --color-error: #ff8863;
+  --color-error: #e55a2b;
 
   --radius-field: 9999rem;
   --radius-box: 1rem;
