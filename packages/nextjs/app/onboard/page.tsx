@@ -261,7 +261,7 @@ const OnboardPage: NextPage = () => {
   }
 
   return (
-    <div className="flex flex-col flex-grow pt-6 px-5 max-w-2xl mx-auto w-full bg-base-100/60 backdrop-blur-sm rounded-2xl my-4 pb-6">
+    <div className="flex flex-col pt-6 px-5 max-w-2xl mx-auto w-full bg-base-100/60 backdrop-blur-sm rounded-2xl my-4 pb-6">
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
@@ -274,7 +274,7 @@ const OnboardPage: NextPage = () => {
       </div>
 
       {/* Question */}
-      <div className="flex-1">
+      <div>
         <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-base-content/40">{currentQ.label}</div>
         <p className="text-lg font-medium mb-5 leading-relaxed">{currentQ.prompt}</p>
 
