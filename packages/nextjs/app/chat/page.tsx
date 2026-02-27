@@ -118,10 +118,12 @@ const ChatPage: NextPage = () => {
 
   useEffect(() => {
     if (!address || !isAuthenticated) return;
-    // History + onboard require auth
+    // Reset clawdviction to null so spinner holds until we have a fresh confirmed value
+    setClawdviction(null);
+    fetchStatus();
     checkOnboard();
     loadHistory();
-  }, [address, isAuthenticated, checkOnboard, loadHistory]);
+  }, [address, isAuthenticated, checkOnboard, loadHistory, fetchStatus]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -232,9 +234,9 @@ const ChatPage: NextPage = () => {
   if (!isAuthenticated) {
     return (
       <div className="flex items-center flex-col flex-grow pt-20 px-5">
-        <div className="text-6xl mb-4">🦞</div>
+        <div className="text-6xl mb-4">🔐🦞📡</div>
         <div className="bg-base-100/60 backdrop-blur-sm rounded-xl px-6 py-5 text-center max-w-md">
-          <h2 className="text-2xl font-bold mb-2">Verify Your Wallet</h2>
+          <h2 className="text-2xl font-bold mb-2">Connect to $CLAWD Larvae</h2>
           <p className="text-base-content/60 mb-5">
             Sign a message to prove you own this wallet. It&apos;s free, takes one click, and lasts a week.
           </p>
@@ -245,7 +247,7 @@ const ChatPage: NextPage = () => {
                 Waiting for signature...
               </>
             ) : (
-              "Sign In 🦀"
+              "Sign Message 🦀"
             )}
           </button>
         </div>

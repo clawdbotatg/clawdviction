@@ -8,7 +8,7 @@ export async function authFetch(url: string, authData: AuthData | null, options:
 
   if (authData) {
     headers["x-auth-signature"] = authData.signature;
-    headers["x-auth-message"] = authData.message;
+    headers["x-auth-message"] = btoa(authData.message); // base64 to avoid \n in header
     headers["x-auth-address"] = authData.address;
   }
 
