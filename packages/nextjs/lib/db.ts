@@ -55,11 +55,11 @@ export async function initDb() {
   await sql`
     CREATE TABLE IF NOT EXISTS clawdviction_balances (
       wallet TEXT PRIMARY KEY,
-      balance BIGINT NOT NULL DEFAULT 0,
+      balance NUMERIC NOT NULL DEFAULT 0,
       last_accrued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      accrual_rate BIGINT NOT NULL DEFAULT 0,
-      total_earned BIGINT NOT NULL DEFAULT 0,
-      total_spent BIGINT NOT NULL DEFAULT 0
+      accrual_rate NUMERIC NOT NULL DEFAULT 0,
+      total_earned NUMERIC NOT NULL DEFAULT 0,
+      total_spent NUMERIC NOT NULL DEFAULT 0
     )`;
 
   dbInitialized = true;
