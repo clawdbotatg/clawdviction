@@ -33,6 +33,9 @@ const client = createPublicClient({
   transport: http(`https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`),
 });
 
+// 20M CLAWD staked 24h = 1,000,000 clawdviction
+const DIVISOR = 1_728_000n * 1_000_000_000_000_000_000n; // 1.728e24
+
 const OLD_CONTRACT_START_BLOCK = 42600842n;
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ wallet: string }> }) {
@@ -86,7 +89,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         toBlock: "latest",
       });
       for (const log of oldUnstakedLogs) {
-        oldClawdviction += log.args.clawdviction ?? 0n;
+        oldClawdviction += (log.args.clawdviction ?? 0n) / DIVISOR;
       }
     } catch (e) {
       console.error("Error fetching old contract events:", e);
@@ -114,14 +117,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       const amount = log.args.amount ?? 0n;
       const stakedAt = log.args.stakedAt ?? 0n;
       const unstakedAt = log.args.unstakedAt ?? 0n;
-      newCompleted += amount * (unstakedAt - stakedAt);
+      newCompleted += (amount * (unstakedAt - stakedAt)) / DIVISOR;
     }
 
     let activeAccrued = 0n;
     let currentTotalStaked = 0n;
     const [amounts, stakedAts] = activeStakes;
     for (let i = 0; i < amounts.length; i++) {
-      activeAccrued += amounts[i] * (nowUnix - stakedAts[i]);
+      activeAccrued += (amounts[i] * (nowUnix - stakedAts[i])) / DIVISOR;
       currentTotalStaked += amounts[i];
     }
 
@@ -132,7 +135,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       try {
         await sql`
           INSERT INTO clawdviction_balances (wallet, balance, last_accrued_at, accrual_rate, total_earned, total_spent)
-          VALUES (${walletLower}, ${totalCv.toString()}::numeric, ${now.toISOString()}, ${currentTotalStaked.toString()}::numeric, ${totalCv.toString()}::numeric, 0)
+          VALUES (${walletLower}, ${totalCv.toString()}::numeric, ${now.toISOString()}, ${(currentTotalStaked / DIVISOR).toString()}::numeric, ${totalCv.toString()}::numeric, 0)
           ON CONFLICT (wallet) DO NOTHING`;
       } catch (e) {
         console.error("Error seeding DB:", e);
@@ -141,7 +144,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     return NextResponse.json({
       clawdviction: totalCv.toString(),
-      accrualRate: currentTotalStaked.toString(),
+      accrualRate: (currentTotalStaked / DIVISOR).toString(),
       lastAccruedAt: now.toISOString(),
       balance: totalCv.toString(),
       totalEarned: totalCv.toString(),

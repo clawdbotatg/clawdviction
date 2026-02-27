@@ -26,6 +26,9 @@ const ABI = [
   },
 ] as const;
 
+// 20M CLAWD staked 24h = 1,000,000 clawdviction
+const DIVISOR = 1_728_000n * 1_000_000_000_000_000_000n; // 1.728e24
+
 const client = createPublicClient({
   chain: base,
   transport: http(`https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`),
@@ -77,7 +80,7 @@ export async function GET(request: NextRequest) {
       const amount = log.args.amount ?? 0n;
       const stakedAt = log.args.stakedAt ?? 0n;
       const unstakedAt = log.args.unstakedAt ?? 0n;
-      const cv = amount * (unstakedAt - stakedAt);
+      const cv = (amount * (unstakedAt - stakedAt)) / DIVISOR;
       unstakedCvByWallet.set(w, (unstakedCvByWallet.get(w) ?? 0n) + cv);
     }
 
@@ -102,7 +105,7 @@ export async function GET(request: NextRequest) {
         let activeAccrued = 0n;
         for (let i = 0; i < amounts.length; i++) {
           currentTotalStaked += amounts[i];
-          activeAccrued += amounts[i] * (nowUnix - stakedAts[i]);
+          activeAccrued += (amounts[i] * (nowUnix - stakedAts[i])) / DIVISOR;
         }
 
         const completedCv = unstakedCvByWallet.get(w) ?? 0n;
@@ -122,14 +125,14 @@ export async function GET(request: NextRequest) {
             UPDATE clawdviction_balances SET
               balance = ${newBalance.toString()}::numeric,
               last_accrued_at = ${now.toISOString()},
-              accrual_rate = ${currentTotalStaked.toString()}::numeric,
+              accrual_rate = ${(currentTotalStaked / DIVISOR).toString()}::numeric,
               total_earned = ${newTotalEarned.toString()}::numeric
             WHERE wallet = ${w}`;
         } else {
           // New wallet — seed with on-chain data
           await sql`
             INSERT INTO clawdviction_balances (wallet, balance, last_accrued_at, accrual_rate, total_earned, total_spent)
-            VALUES (${w}, ${totalEarnedFromChain.toString()}::numeric, ${now.toISOString()}, ${currentTotalStaked.toString()}::numeric, ${totalEarnedFromChain.toString()}::numeric, 0)`;
+            VALUES (${w}, ${totalEarnedFromChain.toString()}::numeric, ${now.toISOString()}, ${(currentTotalStaked / DIVISOR).toString()}::numeric, ${totalEarnedFromChain.toString()}::numeric, 0)`;
         }
 
         processed++;

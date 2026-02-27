@@ -176,9 +176,10 @@ const StakePage: NextPage = () => {
   const needsApproval = parsedAmount > 0n && ((allowance as bigint) ?? 0n) < parsedAmount;
 
   const formatClawdviction = (score: string) => {
-    const n = Number(score) / 1e18; // scores are in wei-seconds
+    const n = Number(score);
     if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
     if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+    if (n >= 1) return n.toFixed(2);
     return n.toFixed(0);
   };
 
@@ -299,7 +300,7 @@ const StakePage: NextPage = () => {
       </div>
 
       {/* Larva CTA — unlocks at 1M clawdviction */}
-      {clawdvictionScore !== null && BigInt(clawdvictionScore) >= 1_000_000n * 10n ** 18n && (
+      {clawdvictionScore !== null && BigInt(clawdvictionScore) >= 1_000_000n && (
         <div className="w-full max-w-lg my-4">
           <Link href="/chat" className="btn btn-primary btn-lg w-full shadow-xl">
             🦞 Train Your Larva
