@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useFetchNativeCurrencyPrice } from "@scaffold-ui/hooks";
 import type { NextPage } from "next";
 import { formatEther, parseEther } from "viem";
-import { useAccount, useReadContract } from "wagmi";
+import { useAccount, useReadContract, useSwitchChain } from "wagmi";
 import { Address, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import {
   useDeployedContractInfo,
@@ -44,6 +44,7 @@ const POOL_ABI = [
 const StakePage: NextPage = () => {
   const { address: connectedAddress, chain, status: walletStatus } = useAccount();
   const { targetNetwork } = useTargetNetwork();
+  const { switchChain } = useSwitchChain();
   const [mounted, setMounted] = useState(false);
   const [stakeAmount, setStakeAmount] = useState("");
   const [clawdvictionScore, setClawdvictionScore] = useState<string | null>(null);
@@ -325,9 +326,19 @@ const StakePage: NextPage = () => {
             onChange={e => setStakeAmount(e.target.value)}
           />
 
-          {/* Four-state flow: ONE button at a time */}
+          {/* USD preview for input amount */}
+          {clawdUsdPrice && parsedAmount > 0n && (
+            <p className="text-sm text-base-content/50 -mt-2 mb-3">
+              ≈ $
+              {(Number(formatEther(parsedAmount)) * clawdUsdPrice).toLocaleString(undefined, {
+                maximumFractionDigits: 2,
+              })}
+            </p>
+          )}
+
+          {/* Three-state flow: ONE button at a time */}
           {isWrongNetwork ? (
-            <button className="btn btn-warning w-full" onClick={() => {}}>
+            <button className="btn btn-warning w-full" onClick={() => switchChain({ chainId: targetNetwork.id })}>
               ⚠️ Switch to {targetNetwork.name}
             </button>
           ) : needsApproval ? (
@@ -384,6 +395,15 @@ const StakePage: NextPage = () => {
                 <div key={i} className="flex items-center justify-between bg-base-100 rounded-lg p-3">
                   <div>
                     <span className="font-bold">{Number(formatEther(amount)).toLocaleString()} CLAWD</span>
+                    {clawdUsdPrice && amount > 0n && (
+                      <span className="text-xs text-base-content/50 ml-1">
+                        ($
+                        {(Number(formatEther(amount)) * clawdUsdPrice).toLocaleString(undefined, {
+                          maximumFractionDigits: 2,
+                        })}
+                        )
+                      </span>
+                    )}
                     <span className="text-xs text-base-content/50 ml-2">
                       since {new Date(Number(activeStakesData[1][i]) * 1000).toLocaleDateString()}
                     </span>
