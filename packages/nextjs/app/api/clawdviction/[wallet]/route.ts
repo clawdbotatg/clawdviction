@@ -1,20 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createPublicClient, getAddress, http, parseAbiItem } from "viem";
 import { base } from "viem/chains";
+import { initDb, isDbAvailable, sql } from "~~/lib/db";
 
 const STAKING_ADDRESS = "0xFE69980a1203d664488A73aE806514d2a04C1F8a" as const;
-// Also read from old contract for historical clawdviction
 const OLD_STAKING_ADDRESS = "0xAF206d40F293f5892ce86986BaFF5BB426a188a1" as const;
 
-const StakedEvent = parseAbiItem(
-  "event Staked(address indexed user, uint256 amount, uint256 stakeIndex, uint256 stakedAt)",
-);
 const UnstakedEvent = parseAbiItem(
   "event Unstaked(address indexed user, uint256 amount, uint256 stakeIndex, uint256 stakedAt, uint256 unstakedAt)",
 );
 
-// Old contract events (different signature)
-const OldStakedEvent = parseAbiItem("event Staked(address indexed user, uint256 amount, uint256 stakeIndex)");
 const OldUnstakedEvent = parseAbiItem(
   "event Unstaked(address indexed user, uint256 amount, uint256 stakeIndex, uint256 clawdviction)",
 );
@@ -38,7 +33,6 @@ const client = createPublicClient({
   transport: http(`https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`),
 });
 
-// Old contract deployed around block 42600842
 const OLD_CONTRACT_START_BLOCK = 42600842n;
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ wallet: string }> }) {
@@ -51,58 +45,55 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "Invalid address" }, { status: 400 });
     }
 
-    const now = BigInt(Math.floor(Date.now() / 1000));
+    const walletLower = wallet.toLowerCase();
+    const now = new Date();
+    const nowUnix = BigInt(Math.floor(now.getTime() / 1000));
 
-    // Fetch old contract events for historical clawdviction
+    await initDb();
+    const dbOk = await isDbAvailable();
+
+    if (dbOk) {
+      const result = await sql`SELECT * FROM clawdviction_balances WHERE wallet = ${walletLower}`;
+      if (result.rows.length > 0) {
+        const row = result.rows[0];
+        const balance = BigInt(row.balance);
+        const accrualRate = BigInt(row.accrual_rate);
+        const lastAccruedAt = new Date(row.last_accrued_at);
+        const elapsed = nowUnix - BigInt(Math.floor(lastAccruedAt.getTime() / 1000));
+        const pending = accrualRate * (elapsed > 0n ? elapsed : 0n);
+        const totalCv = balance + pending;
+
+        return NextResponse.json({
+          clawdviction: totalCv.toString(),
+          accrualRate: accrualRate.toString(),
+          lastAccruedAt: lastAccruedAt.toISOString(),
+          balance: balance.toString(),
+          totalEarned: row.total_earned.toString(),
+          totalSpent: row.total_spent.toString(),
+        });
+      }
+    }
+
+    // No DB row — seed from chain
+    // Old contract historical
     let oldClawdviction = 0n;
     try {
-      const [oldStakedLogs, oldUnstakedLogs] = await Promise.all([
-        client.getLogs({
-          address: OLD_STAKING_ADDRESS,
-          event: OldStakedEvent,
-          args: { user: wallet },
-          fromBlock: OLD_CONTRACT_START_BLOCK,
-          toBlock: "latest",
-        }),
-        client.getLogs({
-          address: OLD_STAKING_ADDRESS,
-          event: OldUnstakedEvent,
-          args: { user: wallet },
-          fromBlock: OLD_CONTRACT_START_BLOCK,
-          toBlock: "latest",
-        }),
-      ]);
-
-      // Old unstaked events include the clawdviction directly
+      const oldUnstakedLogs = await client.getLogs({
+        address: OLD_STAKING_ADDRESS,
+        event: OldUnstakedEvent,
+        args: { user: wallet },
+        fromBlock: OLD_CONTRACT_START_BLOCK,
+        toBlock: "latest",
+      });
       for (const log of oldUnstakedLogs) {
         oldClawdviction += log.args.clawdviction ?? 0n;
       }
-
-      // Check if any old stakes are still active (they shouldn't be since Austin unstaked everything)
-      // Build a map of stakeIndex -> staked info
-      const oldStakes = new Map<bigint, { amount: bigint; block: bigint }>();
-      for (const log of oldStakedLogs) {
-        oldStakes.set(log.args.stakeIndex!, { amount: log.args.amount!, block: log.blockNumber });
-      }
-      for (const log of oldUnstakedLogs) {
-        oldStakes.delete(log.args.stakeIndex!);
-      }
-      // Any remaining old stakes are still active (unlikely but handle it)
-      // We can't easily get their stakedAt from old events (old Staked didn't have stakedAt)
-      // so just skip — Austin unstaked everything
     } catch (e) {
       console.error("Error fetching old contract events:", e);
     }
 
-    // Fetch new contract events + active stakes
-    const [, unstakedLogs, activeStakes] = await Promise.all([
-      client.getLogs({
-        address: STAKING_ADDRESS,
-        event: StakedEvent,
-        args: { user: wallet },
-        fromBlock: "earliest",
-        toBlock: "latest",
-      }),
+    // New contract
+    const [unstakedLogs, activeStakes] = await Promise.all([
       client.getLogs({
         address: STAKING_ADDRESS,
         event: UnstakedEvent,
@@ -118,7 +109,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       }),
     ]);
 
-    // Calculate clawdviction from completed stakes (new contract)
     let newCompleted = 0n;
     for (const log of unstakedLogs) {
       const amount = log.args.amount ?? 0n;
@@ -127,22 +117,35 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       newCompleted += amount * (unstakedAt - stakedAt);
     }
 
-    // Calculate clawdviction from active stakes
     let activeAccrued = 0n;
     let currentTotalStaked = 0n;
     const [amounts, stakedAts] = activeStakes;
     for (let i = 0; i < amounts.length; i++) {
-      const amount = amounts[i];
-      const stakedAt = stakedAts[i];
-      activeAccrued += amount * (now - stakedAt);
-      currentTotalStaked += amount;
+      activeAccrued += amounts[i] * (nowUnix - stakedAts[i]);
+      currentTotalStaked += amounts[i];
     }
 
-    const totalClawdviction = oldClawdviction + newCompleted + activeAccrued;
+    const totalCv = oldClawdviction + newCompleted + activeAccrued;
+
+    // Seed into DB
+    if (dbOk) {
+      try {
+        await sql`
+          INSERT INTO clawdviction_balances (wallet, balance, last_accrued_at, accrual_rate, total_earned, total_spent)
+          VALUES (${walletLower}, ${totalCv.toString()}::bigint, ${now.toISOString()}, ${currentTotalStaked.toString()}::bigint, ${totalCv.toString()}::bigint, 0)
+          ON CONFLICT (wallet) DO NOTHING`;
+      } catch (e) {
+        console.error("Error seeding DB:", e);
+      }
+    }
 
     return NextResponse.json({
-      clawdviction: totalClawdviction.toString(),
+      clawdviction: totalCv.toString(),
       accrualRate: currentTotalStaked.toString(),
+      lastAccruedAt: now.toISOString(),
+      balance: totalCv.toString(),
+      totalEarned: totalCv.toString(),
+      totalSpent: "0",
     });
   } catch (error) {
     console.error("Error reading clawdviction:", error);
