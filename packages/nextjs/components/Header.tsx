@@ -29,10 +29,6 @@ export const menuLinks: HeaderMenuLink[] = [
     href: "/chat",
   },
   {
-    label: "Onboard",
-    href: "/onboard",
-  },
-  {
     label: "About",
     href: "/about",
   },

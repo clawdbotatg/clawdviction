@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initDb, isDbAvailable, sql } from "~~/lib/db";
+import { verifyAuth } from "~~/lib/verifyAuth";
 
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ wallet: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ wallet: string }> }) {
   const { wallet } = await params;
+  const verified = await verifyAuth(request);
+  if (!verified || verified !== wallet.toLowerCase()) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   await initDb();
   if (!(await isDbAvailable())) {

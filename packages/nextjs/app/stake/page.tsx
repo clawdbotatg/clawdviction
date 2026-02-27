@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useFetchNativeCurrencyPrice } from "@scaffold-ui/hooks";
 import type { NextPage } from "next";
-import { formatEther, parseEther } from "viem";
+import { createPublicClient, formatEther, http, parseEther } from "viem";
+import { base } from "viem/chains";
 import { useAccount, useReadContract } from "wagmi";
 import { Address, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import {
@@ -13,8 +14,6 @@ import {
   useScaffoldWriteContract,
   useTargetNetwork,
 } from "~~/hooks/scaffold-eth";
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "";
 
 const CLAWD_ETH_POOL = "0xCD55381a53da35Ab1D7Bc5e3fE5F76cac976FAc3" as const;
 const WETH_BASE = "0x4200000000000000000000000000000000000006";
@@ -44,11 +43,14 @@ const POOL_ABI = [
 ] as const;
 
 const StakePage: NextPage = () => {
-  const { address: connectedAddress, chain } = useAccount();
+  const { address: connectedAddress, chain, status: walletStatus } = useAccount();
   const { targetNetwork } = useTargetNetwork();
+  const [mounted, setMounted] = useState(false);
   const [stakeAmount, setStakeAmount] = useState("");
-  const [clawdvictionScore, setClawdvictionScore] = useState("0");
+  const [clawdvictionScore, setClawdvictionScore] = useState<string | null>(null);
   const [, setActiveStakesFromBackend] = useState<any[]>([]);
+  // Real stake indices from the contract — display index !== contract index after any unstake
+  const [realStakeIndices, setRealStakeIndices] = useState<number[]>([]);
 
   // Contract info
   const { data: stakingContractData } = useDeployedContractInfo("ClawdVictionStaking");
@@ -88,6 +90,13 @@ const StakePage: NextPage = () => {
     watch: true,
   });
 
+  const { data: stakeCount } = useScaffoldReadContract({
+    contractName: "ClawdVictionStaking",
+    functionName: "getStakeCount",
+    args: [connectedAddress],
+    watch: true,
+  });
+
   // CLAWD/ETH Uniswap V3 price
   const { price: ethPrice } = useFetchNativeCurrencyPrice();
   const { data: slot0Data } = useReadContract({ address: CLAWD_ETH_POOL, abi: POOL_ABI, functionName: "slot0" });
@@ -116,16 +125,70 @@ const StakePage: NextPage = () => {
   // Track which unstake button is loading
   const [unstakingIndex, setUnstakingIndex] = useState<number | null>(null);
 
+  // Resolve real contract indices for each active stake
+  // getActiveStakes() filters out empty slots but doesn't return original indices —
+  // after any unstake the display index no longer matches the contract index
+  useEffect(() => {
+    if (!connectedAddress || !stakeCount || stakeCount === 0n || !stakingContractData?.address) return;
+    const STAKES_ABI = [
+      {
+        inputs: [
+          { internalType: "address", name: "", type: "address" },
+          { internalType: "uint256", name: "", type: "uint256" },
+        ],
+        name: "stakes",
+        outputs: [
+          { internalType: "uint256", name: "amount", type: "uint256" },
+          { internalType: "uint256", name: "stakedAt", type: "uint256" },
+        ],
+        stateMutability: "view",
+        type: "function",
+      },
+    ] as const;
+    const viemClient = createPublicClient({ chain: base, transport: http() });
+    const count = Number(stakeCount);
+    const calls = Array.from({ length: count }, (_, i) => ({
+      address: stakingContractData.address as `0x${string}`,
+      abi: STAKES_ABI,
+      functionName: "stakes" as const,
+      args: [connectedAddress, BigInt(i)] as const,
+    }));
+    viemClient.multicall({ contracts: calls }).then(results => {
+      const indices: number[] = [];
+      results.forEach((r, i) => {
+        if (r.status === "success" && (r.result as [bigint, bigint])[0] > 0n) {
+          indices.push(i);
+        }
+      });
+      setRealStakeIndices(indices);
+    });
+  }, [connectedAddress, stakeCount, activeStakesData, stakingContractData?.address]);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Safety timeout — if clawdviction never resolves after 8s, default to "0"
+  useEffect(() => {
+    if (!connectedAddress) return;
+    const t = setTimeout(() => setClawdvictionScore(s => (s === null ? "0" : s)), 8000);
+    return () => clearTimeout(t);
+  }, [connectedAddress]);
+
   // Poll backend for clawdviction score
   const fetchClawdviction = useCallback(async () => {
     if (!connectedAddress) return;
     try {
-      const res = await fetch(`${BACKEND_URL}/api/clawdviction/${connectedAddress}`);
+      const res = await fetch(`/api/clawdviction/${connectedAddress}`);
       const data = await res.json();
-      setClawdvictionScore(data.clawdviction || "0");
+      if (data.clawdviction != null) {
+        setClawdvictionScore(data.clawdviction);
+      } else {
+        setClawdvictionScore("0");
+      }
       setActiveStakesFromBackend(data.activeStakes || []);
     } catch {
-      // Backend might not be running — fall back to on-chain
+      // Leave as null on failure — interval will retry
     }
   }, [connectedAddress]);
 
@@ -176,12 +239,14 @@ const StakePage: NextPage = () => {
     setTimeout(openWalletDeepLink, 2000);
   };
 
-  const handleUnstake = async (index: number) => {
-    setUnstakingIndex(index);
+  const handleUnstake = async (displayIndex: number) => {
+    // Use the real contract index, not the display index
+    const contractIndex = realStakeIndices[displayIndex] ?? displayIndex;
+    setUnstakingIndex(displayIndex);
     try {
       await unstakeWrite({
         functionName: "unstake",
-        args: [BigInt(index)],
+        args: [BigInt(contractIndex)],
       });
     } finally {
       setUnstakingIndex(null);
@@ -198,7 +263,21 @@ const StakePage: NextPage = () => {
 
   // --- RENDER ---
 
-  // State 1: Not connected
+  // Spinner until mounted + wallet known + clawdviction confirmed
+  if (
+    !mounted ||
+    walletStatus === "connecting" ||
+    walletStatus === "reconnecting" ||
+    (connectedAddress && clawdvictionScore === null)
+  ) {
+    return (
+      <div className="flex items-center justify-center flex-grow pt-20">
+        <span className="loading loading-spinner loading-lg"></span>
+      </div>
+    );
+  }
+
+  // Not connected
   if (!connectedAddress) {
     return (
       <div className="flex items-center flex-col flex-grow pt-20">
@@ -235,7 +314,7 @@ const StakePage: NextPage = () => {
         </div>
         <div className="stat bg-base-200 rounded-xl shadow">
           <div className="stat-title">Your ClawdViction</div>
-          <div className="stat-value text-error text-2xl">{formatClawdviction(clawdvictionScore)} 🦀</div>
+          <div className="stat-value text-error text-2xl">{formatClawdviction(clawdvictionScore ?? "0")} 🦀</div>
         </div>
         <div className="stat bg-base-200 rounded-xl shadow">
           <div className="stat-title">Total Staked (All)</div>
@@ -246,7 +325,7 @@ const StakePage: NextPage = () => {
       </div>
 
       {/* Larva CTA — unlocks at 1M clawdviction */}
-      {BigInt(clawdvictionScore) >= 1_000_000n * 10n ** 18n && (
+      {clawdvictionScore !== null && BigInt(clawdvictionScore) >= 1_000_000n * 10n ** 18n && (
         <div className="w-full max-w-lg my-4">
           <Link href="/chat" className="btn btn-primary btn-lg w-full shadow-xl">
             🦞 Train Your Larva

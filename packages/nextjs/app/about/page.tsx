@@ -22,9 +22,9 @@ const AboutPage: NextPage = () => {
               rel="noopener noreferrer"
               className="link link-error"
             >
-              Vitalik Buterin&apos;s vision
+              Vitalik&apos;s tweet
             </a>{" "}
-            of personal AI agents for democratic governance.
+            about personal AI agents for democratic governance.
           </p>
 
           <p>

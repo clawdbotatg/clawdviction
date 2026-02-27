@@ -30,3 +30,4 @@ packages/foundry/cache/
 packages/foundry/.gitmodules
 packages/foundry/foundry.lock
 packages/foundry/lib/
+.vercel

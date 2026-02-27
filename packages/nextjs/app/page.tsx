@@ -12,9 +12,9 @@ const Home: NextPage = () => {
     <div className="flex items-center flex-col flex-grow">
       {/* Hero — show the painting, CTA at bottom */}
       <div className="flex flex-col items-center justify-end px-5 text-center w-full" style={{ minHeight: "70vh" }}>
-        <div className="pb-12">
+        <div className="pb-[168px]">
           {isConnected ? (
-            <Link href="/stake" className="btn btn-primary btn-lg shadow-xl">
+            <Link href="/stake" className="btn btn-primary btn-lg shadow-xl text-xl px-10 py-4 h-auto">
               Start Staking 🦞
             </Link>
           ) : (

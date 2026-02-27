@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { compressMemory, initDb, isDbAvailable, sql } from "~~/lib/db";
+import { verifyAuth } from "~~/lib/verifyAuth";
 
 const LARVA_SYSTEM_PROMPT = (
   wallet: string,
@@ -20,10 +21,17 @@ This conversation persists — you remember everything across sessions.`;
 
 export async function POST(request: NextRequest) {
   try {
+    const verified = await verifyAuth(request);
+    if (!verified) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const { wallet, message, messages: clientMessages, identityBrief } = await request.json();
 
     if (!wallet || !message) {
       return NextResponse.json({ error: "Missing wallet or message" }, { status: 400 });
+    }
+
+    if (verified !== wallet.toLowerCase()) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const apiKey = process.env.ANTHROPIC_API_KEY;

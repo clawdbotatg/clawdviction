@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initDb, isDbAvailable, sql } from "~~/lib/db";
+import { verifyAuth } from "~~/lib/verifyAuth";
 
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ wallet: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ wallet: string }> }) {
   const { wallet } = await params;
+  const verified = await verifyAuth(request);
+  if (!verified || verified !== wallet.toLowerCase()) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  // ⚠️ wallet is stored mixed-case (checksummed) in DB — never use lower() when querying or deleting
 
   await initDb();
   if (!(await isDbAvailable())) {
@@ -32,6 +38,10 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 export async function POST(request: NextRequest, { params }: { params: Promise<{ wallet: string }> }) {
   try {
     const { wallet } = await params;
+    const verified = await verifyAuth(request);
+    if (!verified || verified !== wallet.toLowerCase()) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const { answers } = await request.json();
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
