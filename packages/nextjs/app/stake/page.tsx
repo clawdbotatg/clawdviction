@@ -4,8 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useFetchNativeCurrencyPrice } from "@scaffold-ui/hooks";
 import type { NextPage } from "next";
-import { createPublicClient, formatEther, http, parseEther } from "viem";
-import { base } from "viem/chains";
+import { formatEther, parseEther } from "viem";
 import { useAccount, useReadContract } from "wagmi";
 import { Address, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import {
@@ -49,12 +48,9 @@ const StakePage: NextPage = () => {
   const [stakeAmount, setStakeAmount] = useState("");
   const [clawdvictionScore, setClawdvictionScore] = useState<string | null>(null);
   const [cvAccrualRate, setCvAccrualRate] = useState<string>("0");
-  const [cvLastAccruedAt, setCvLastAccruedAt] = useState<string | null>(null);
-  const [cvBalance, setCvBalance] = useState<string>("0");
+  const [cvFetchedAt, setCvFetchedAt] = useState<number>(Date.now());
+  const [cvBase, setCvBase] = useState<string>("0");
   const [liveClawdviction, setLiveClawdviction] = useState<string | null>(null);
-  const [, setActiveStakesFromBackend] = useState<unknown[]>([]);
-  // Real stake indices from the contract — display index !== contract index after any unstake
-  const [realStakeIndices, setRealStakeIndices] = useState<number[]>([]);
 
   // Contract info
   const { data: stakingContractData } = useDeployedContractInfo("ClawdVictionStaking");
@@ -94,13 +90,6 @@ const StakePage: NextPage = () => {
     watch: true,
   });
 
-  const { data: stakeCount } = useScaffoldReadContract({
-    contractName: "ClawdVictionStaking",
-    functionName: "getStakeCount",
-    args: [connectedAddress],
-    watch: true,
-  });
-
   // CLAWD/ETH Uniswap V3 price
   const { price: ethPrice } = useFetchNativeCurrencyPrice();
   const { data: slot0Data } = useReadContract({ address: CLAWD_ETH_POOL, abi: POOL_ABI, functionName: "slot0" });
@@ -129,44 +118,7 @@ const StakePage: NextPage = () => {
   // Track which unstake button is loading
   const [unstakingIndex, setUnstakingIndex] = useState<number | null>(null);
 
-  // Resolve real contract indices for each active stake
-  // getActiveStakes() filters out empty slots but doesn't return original indices —
-  // after any unstake the display index no longer matches the contract index
-  useEffect(() => {
-    if (!connectedAddress || !stakeCount || stakeCount === 0n || !stakingContractData?.address) return;
-    const STAKES_ABI = [
-      {
-        inputs: [
-          { internalType: "address", name: "", type: "address" },
-          { internalType: "uint256", name: "", type: "uint256" },
-        ],
-        name: "stakes",
-        outputs: [
-          { internalType: "uint256", name: "amount", type: "uint256" },
-          { internalType: "uint256", name: "stakedAt", type: "uint256" },
-        ],
-        stateMutability: "view",
-        type: "function",
-      },
-    ] as const;
-    const viemClient = createPublicClient({ chain: base, transport: http() });
-    const count = Number(stakeCount);
-    const calls = Array.from({ length: count }, (_, i) => ({
-      address: stakingContractData.address as `0x${string}`,
-      abi: STAKES_ABI,
-      functionName: "stakes" as const,
-      args: [connectedAddress, BigInt(i)] as const,
-    }));
-    viemClient.multicall({ contracts: calls }).then(results => {
-      const indices: number[] = [];
-      results.forEach((r, i) => {
-        if (r.status === "success" && (r.result as [bigint, bigint])[0] > 0n) {
-          indices.push(i);
-        }
-      });
-      setRealStakeIndices(indices);
-    });
-  }, [connectedAddress, stakeCount, activeStakesData, stakingContractData?.address]);
+  // Active stake indices now come directly from getActiveStakes (3rd return value)
 
   useEffect(() => {
     setMounted(true);
@@ -185,15 +137,10 @@ const StakePage: NextPage = () => {
     try {
       const res = await fetch(`/api/clawdviction/${connectedAddress}`);
       const data = await res.json();
-      if (data.clawdviction != null) {
-        setClawdvictionScore(data.clawdviction);
-      } else {
-        setClawdvictionScore("0");
-      }
+      setClawdvictionScore(data.clawdviction ?? "0");
       if (data.accrualRate != null) setCvAccrualRate(data.accrualRate);
-      if (data.lastAccruedAt != null) setCvLastAccruedAt(data.lastAccruedAt);
-      if (data.balance != null) setCvBalance(data.balance);
-      setActiveStakesFromBackend(data.activeStakes || []);
+      setCvBase(data.clawdviction ?? "0");
+      setCvFetchedAt(Date.now());
     } catch {
       // Leave as null on failure — interval will retry
     }
@@ -207,20 +154,19 @@ const StakePage: NextPage = () => {
 
   // Live optimistic counter — ticks every second
   useEffect(() => {
-    if (!cvLastAccruedAt || !cvBalance) return;
     const rate = BigInt(cvAccrualRate);
-    const base = BigInt(cvBalance);
-    const accrueStart = new Date(cvLastAccruedAt).getTime();
+    const baseVal = BigInt(cvBase);
+    const fetchTime = cvFetchedAt;
 
     const tick = () => {
-      const elapsed = BigInt(Math.max(0, Math.floor((Date.now() - accrueStart) / 1000)));
-      const current = base + rate * elapsed;
+      const elapsed = BigInt(Math.max(0, Math.floor((Date.now() - fetchTime) / 1000)));
+      const current = baseVal + rate * elapsed;
       setLiveClawdviction(current.toString());
     };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [cvBalance, cvAccrualRate, cvLastAccruedAt]);
+  }, [cvBase, cvAccrualRate, cvFetchedAt]);
 
   // Determine state
   const isWrongNetwork = chain && chain.id !== targetNetwork.id;
@@ -264,13 +210,14 @@ const StakePage: NextPage = () => {
   };
 
   const handleUnstake = async (displayIndex: number) => {
-    // Use the real contract index, not the display index
-    const contractIndex = realStakeIndices[displayIndex] ?? displayIndex;
+    // getActiveStakes now returns indices as 3rd array — use directly
+    const contractIndex = activeStakesData?.[2]?.[displayIndex];
+    if (contractIndex == null) return;
     setUnstakingIndex(displayIndex);
     try {
       await unstakeWrite({
         functionName: "unstake",
-        args: [BigInt(contractIndex)],
+        args: [contractIndex],
       });
     } finally {
       setUnstakingIndex(null);

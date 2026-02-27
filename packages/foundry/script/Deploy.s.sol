@@ -1,33 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./DeployHelpers.s.sol";
-import "../contracts/MockCLAWD.sol";
+import "forge-std/Script.sol";
 import "../contracts/ClawdVictionStaking.sol";
 
-contract DeployScript is ScaffoldETHDeploy {
-    error InvalidPrivateKey(string);
-
+contract DeployScript is Script {
     function run() external {
-        uint256 deployerPrivateKey = setupLocalhostEnv();
-        if (deployerPrivateKey == 0) {
-            revert InvalidPrivateKey(
-                "You don't have a deployer account. Make sure you have set DEPLOYER_PRIVATE_KEY in .env or use `yarn generate` to generate a new random account"
-            );
-        }
+        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        address clawdToken = 0x9f86dB9fc6f7c9408e8Fda3Ff8ce4e78ac7a6b07;
 
         vm.startBroadcast(deployerPrivateKey);
-
-        // Deploy mock CLAWD token
-        MockCLAWD clawdToken = new MockCLAWD();
-        console.logString(string.concat("MockCLAWD deployed at: ", vm.toString(address(clawdToken))));
-
-        // Deploy staking contract
-        ClawdVictionStaking staking = new ClawdVictionStaking(address(clawdToken));
-        console.logString(string.concat("ClawdVictionStaking deployed at: ", vm.toString(address(staking))));
-
+        ClawdVictionStaking staking = new ClawdVictionStaking(clawdToken);
+        console.log("ClawdVictionStaking deployed at:", address(staking));
         vm.stopBroadcast();
-
-        exportDeployments();
     }
 }
