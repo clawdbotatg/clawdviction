@@ -3,97 +3,16 @@
 import { useEffect, useState } from "react";
 import type { AuthData } from "~~/hooks/useAuth";
 import { authFetch } from "~~/lib/authFetch";
+import { QUESTIONS } from "~~/lib/questions";
 
 interface Answers {
   [key: string]: string;
 }
 
-export const QUESTIONS = [
-  {
-    id: "identity",
-    label: "Who are you?",
-    prompt:
-      "What should I call you? And what brought you to $CLAWD — the AI agent thesis, the games, the community, the tokenomics, something else?",
-    type: "textarea",
-    placeholder:
-      "e.g. I go by JDI. Came for the AI angle — I think autonomous agents building onchain apps is the real unlock...",
-  },
-  {
-    id: "holder_value",
-    label: "What does holding CLAWD get you?",
-    prompt: "What do you actually get for holding $CLAWD? And what do you wish you got?",
-    type: "textarea",
-    placeholder:
-      "e.g. Right now mostly early access and vibes. What I wish I had: rev share, token-gated AI tools, something real...",
-  },
-  {
-    id: "staking_mechanics",
-    label: "Staking lockup & burn split",
-    prompt:
-      "If we stake $CLAWD, how long should it be locked up? What percent should you earn on it? And what percent should we burn?\n\n(Both the earned and burned amounts come straight out of the treasury in $CLAWD.)\n\nFor example: 3 month lockup, 1% earned, 2% burned.",
-    type: "textarea",
-    placeholder: "e.g. 3 month lockup, 1% earned, 2% burned — I'd want a real commitment before seeing any yield...",
-  },
-  {
-    id: "build_priorities",
-    label: "What should we build?",
-    prompt:
-      "Quick reactions to broad categories of things we could build — tell me what excites you, what you'd skip, what you'd actively kill:",
-    type: "checklist",
-    options: [
-      { value: "games_gambling", label: "🎮 Games & gambling" },
-      { value: "ai_agents", label: "🤖 AI agents & tools" },
-      { value: "trading_speculation", label: "📊 Trading / speculation" },
-      { value: "social_identity", label: "🎨 Social / identity / community" },
-      { value: "revenue_burns", label: "🔄 Revenue & burns" },
-    ],
-    subPrompt: "Anything else you'd love to see built?",
-    subPlaceholder: "e.g. I'd love a launchpad where projects have to burn CLAWD to launch...",
-  },
-  {
-    id: "risk_tolerance",
-    label: "Risk tolerance",
-    prompt:
-      "The core team proposes spending 500M CLAWD from treasury on something ambitious but unproven. On a scale of 1–5 — 1 being protect the treasury, 5 being bet big we're early. What number are you? Does your answer change if it's an external team vs building in-house?",
-    type: "scale",
-    scaleMin: "1 — protect treasury",
-    scaleMax: "5 — bet big",
-    subPrompt: "Why that number? And in-house vs external?",
-    subPlaceholder: "e.g. I'm a 4 for in-house Austin builds. Maybe a 2 for external teams without track record...",
-  },
-  {
-    id: "hard_lines",
-    label: "Hard lines",
-    prompt:
-      "What would make you immediately vote NO on a proposal, no matter how it was packaged? What's a line you'd never cross?",
-    type: "textarea",
-    placeholder:
-      "e.g. Any marketing/KOL spend. Treasury funds going to teams with no track record. Anything that concentrates power...",
-  },
-  {
-    id: "magic_wand",
-    label: "Magic wand",
-    prompt:
-      "If you could wave a magic wand and have one thing happen for $CLAWD — anything at all, no constraints, no 'is it realistic' — what would it be?",
-    type: "textarea",
-    placeholder:
-      "e.g. Every AI agent in the ecosystem runs on CLAWD. Or: $CLAWD becomes the default fuel for onchain apps...",
-  },
-  {
-    id: "vision_concern",
-    label: "Vision & honest concern",
-    prompt:
-      "What do you actually want $CLAWD to become in 1 year? Not what you think it will — what do you want? And what's your biggest concern about whether it gets there?",
-    type: "textarea",
-    placeholder:
-      "e.g. I want it to be the go-to token for AI compute on Base. My concern is that the AI narrative fades before the apps generate real revenue...",
-  },
-];
-
 interface OnboardingInterviewProps {
   address: string;
   authData: AuthData | null;
-  onComplete: (brief: string) => void;
+  onComplete: () => void;
 }
 
 const STORAGE_KEY = (addr: string) => `clawdviction-onboard-draft-${addr}`;
@@ -172,21 +91,18 @@ export const OnboardingInterview = ({ address, authData, onComplete }: Onboardin
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      const res = await authFetch(`/api/onboard/${address}`, authData, {
+      await authFetch(`/api/onboard/${address}`, authData, {
         method: "POST",
         body: JSON.stringify({ answers }),
       });
-      const data = await res.json();
-      const brief = data.identity_brief || "";
-      if (brief && address) {
-        localStorage.setItem(`clawdviction-brief-${address}`, brief);
-      }
       // Clear the draft now that we've submitted
       localStorage.removeItem(STORAGE_KEY(address));
-      onComplete(brief);
+      // Mark onboarding complete in localStorage so checkOnboard fast-paths next time
+      localStorage.setItem(`clawdviction-onboarded-${address}`, "true");
+      onComplete();
     } catch (e) {
       console.error(e);
-      onComplete("");
+      onComplete();
     } finally {
       setSubmitting(false);
     }

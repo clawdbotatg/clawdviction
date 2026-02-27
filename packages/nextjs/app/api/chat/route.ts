@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { compressMemory, initDb, isDbAvailable, sql } from "~~/lib/db";
+import { formatAnswersAsQA } from "~~/lib/questions";
 import { verifyAuth } from "~~/lib/verifyAuth";
 
 const LARVA_SYSTEM_PROMPT = (
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
     const verified = await verifyAuth(request);
     if (!verified) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { wallet, message, messages: clientMessages, identityBrief } = await request.json();
+    const { wallet, message, messages: clientMessages } = await request.json();
 
     if (!wallet || !message) {
       return NextResponse.json({ error: "Missing wallet or message" }, { status: 400 });
@@ -43,15 +44,15 @@ export async function POST(request: NextRequest) {
     const dbOk = await isDbAvailable();
 
     let history: { role: string; content: string }[];
-    let briefFromDb: string | null = null;
+    let onboardingContext: string | null = null;
 
     if (dbOk) {
-      // Check for DB-stored identity brief (takes priority)
+      // Fetch raw onboarding answers and format as full Q&A
       try {
-        const briefResult = await sql`
-          SELECT identity_brief FROM larva_seeds WHERE wallet = ${wallet} AND completed = true`;
-        if (briefResult.rows.length > 0 && briefResult.rows[0].identity_brief) {
-          briefFromDb = briefResult.rows[0].identity_brief;
+        const seedResult = await sql`
+          SELECT answers FROM larva_seeds WHERE wallet = ${wallet} AND completed = true`;
+        if (seedResult.rows.length > 0 && seedResult.rows[0].answers) {
+          onboardingContext = formatAnswersAsQA(seedResult.rows[0].answers as Record<string, string>);
         }
       } catch {
         /* ignore */
@@ -93,7 +94,11 @@ export async function POST(request: NextRequest) {
           : [{ role: "user", content: message }];
     }
 
-    const effectiveBrief = briefFromDb || identityBrief || null;
+    const systemPrompt =
+      LARVA_SYSTEM_PROMPT(wallet) +
+      (onboardingContext
+        ? `\n\nThis holder completed their onboarding interview. Below are their exact answers — treat these as the foundation of your understanding of who they are:\n\n${onboardingContext}`
+        : "");
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -105,7 +110,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         model: "claude-haiku-4-5",
         max_tokens: 400,
-        system: LARVA_SYSTEM_PROMPT(wallet) + (effectiveBrief ? `\n\n${effectiveBrief}` : ""),
+        system: systemPrompt,
         messages: history,
       }),
     });

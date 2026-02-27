@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initDb, isDbAvailable, sql } from "~~/lib/db";
+import { formatAnswersAsQA } from "~~/lib/questions";
 import { verifyAuth } from "~~/lib/verifyAuth";
 
 const GREET_SYSTEM = (wallet: string) => `You are a Larva — a personal AI governance agent for a $CLAWD token holder.
@@ -18,7 +19,7 @@ export async function POST(request: NextRequest) {
     const verified = await verifyAuth(request);
     if (!verified) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { wallet, identityBrief } = await request.json();
+    const { wallet } = await request.json();
     if (!wallet) return NextResponse.json({ error: "Missing wallet" }, { status: 400 });
 
     if (verified !== wallet.toLowerCase()) {
@@ -37,18 +38,22 @@ export async function POST(request: NextRequest) {
       if (existing.rows.length > 0) return NextResponse.json({ message: null });
     }
 
-    // Pull brief from DB if available (takes priority over client-passed brief)
-    let effectiveBrief = identityBrief || null;
+    // Fetch raw onboarding answers and format as full Q&A
+    let onboardingContext: string | null = null;
     if (dbOk) {
       try {
-        const row = await sql`SELECT identity_brief FROM larva_seeds WHERE wallet = ${wallet} AND completed = true`;
-        if (row.rows[0]?.identity_brief) effectiveBrief = row.rows[0].identity_brief;
+        const row = await sql`SELECT answers FROM larva_seeds WHERE wallet = ${wallet} AND completed = true`;
+        if (row.rows[0]?.answers) {
+          onboardingContext = formatAnswersAsQA(row.rows[0].answers as Record<string, string>);
+        }
       } catch {
         /* ignore */
       }
     }
 
-    const systemPrompt = GREET_SYSTEM(wallet) + (effectiveBrief ? `\n\nHolder onboarding:\n${effectiveBrief}` : "");
+    const systemPrompt =
+      GREET_SYSTEM(wallet) +
+      (onboardingContext ? `\n\nHolder onboarding — their exact answers:\n\n${onboardingContext}` : "");
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",

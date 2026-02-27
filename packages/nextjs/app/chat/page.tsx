@@ -22,7 +22,6 @@ const ChatPage: NextPage = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [identityBrief, setIdentityBrief] = useState<string | null>(null);
   const [clawdviction, setClawdviction] = useState<string | null>(null); // null = not yet confirmed
   const [larvaRunning, setLarvaRunning] = useState(false);
   const [launchingLarva, setLaunchingLarva] = useState(false);
@@ -85,9 +84,8 @@ const ChatPage: NextPage = () => {
   const checkOnboard = useCallback(async () => {
     if (!address || !authData) return;
     // Check localStorage first (fast path)
-    const cached = localStorage.getItem(`clawdviction-brief-${address}`);
-    if (cached) {
-      setIdentityBrief(cached);
+    const cached = localStorage.getItem(`clawdviction-onboarded-${address}`);
+    if (cached === "true") {
       setOnboardComplete(true);
       return;
     }
@@ -96,10 +94,7 @@ const ChatPage: NextPage = () => {
       const data = await res.json();
       if (data.completed) {
         setOnboardComplete(true);
-        if (data.identity_brief) {
-          setIdentityBrief(data.identity_brief);
-          localStorage.setItem(`clawdviction-brief-${address}`, data.identity_brief);
-        }
+        localStorage.setItem(`clawdviction-onboarded-${address}`, "true");
       } else {
         setOnboardComplete(false);
       }
@@ -154,7 +149,7 @@ const ChatPage: NextPage = () => {
     try {
       const res = await authFetch("/api/chat", authData, {
         method: "POST",
-        body: JSON.stringify({ wallet: address, message: userMessage, identityBrief }),
+        body: JSON.stringify({ wallet: address, message: userMessage }),
       });
       const data = await res.json();
       if (data.message) {
@@ -173,7 +168,7 @@ const ChatPage: NextPage = () => {
     try {
       const res = await authFetch("/api/chat/greet", authData, {
         method: "POST",
-        body: JSON.stringify({ wallet: address, identityBrief }),
+        body: JSON.stringify({ wallet: address }),
       });
       const data = await res.json();
       if (data.message) {
@@ -184,7 +179,7 @@ const ChatPage: NextPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [address, identityBrief, authData]);
+  }, [address, authData]);
 
   // Auto-greet on first visit (empty history + onboarding done) — wait for history to load first
   useEffect(() => {
@@ -194,13 +189,12 @@ const ChatPage: NextPage = () => {
       statusLoaded &&
       onboardComplete === true &&
       messages.length === 0 &&
-      identityBrief &&
       address
     ) {
       hasTriggeredGreeting.current = true;
       fetchGreeting();
     }
-  }, [messages, onboardComplete, identityBrief, statusLoaded, historyLoaded, address, fetchGreeting]);
+  }, [messages, onboardComplete, statusLoaded, historyLoaded, address, fetchGreeting]);
 
   // Hold spinner until mounted + wallet known + clawdviction confirmed + (if authed) history + onboard loaded
   if (
@@ -306,8 +300,7 @@ const ChatPage: NextPage = () => {
       <OnboardingInterview
         address={address}
         authData={authData}
-        onComplete={brief => {
-          setIdentityBrief(brief);
+        onComplete={() => {
           setOnboardComplete(true);
         }}
       />
