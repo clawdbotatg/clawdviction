@@ -1,5 +1,9 @@
 // Shared question definitions — used by OnboardingInterview (client) and API routes (server)
 
+// Default char limits — keep answers substantive but bounded
+export const MAX_LENGTH_MAIN = 500; // main textarea answers
+export const MAX_LENGTH_NOTES = 300; // sub-prompt notes (checklist / scale)
+
 export const QUESTIONS = [
   {
     id: "identity",
@@ -7,6 +11,7 @@ export const QUESTIONS = [
     prompt:
       "What should I call you? And what brought you to $CLAWD — the AI agent thesis, the games, the community, the tokenomics, something else?",
     type: "textarea",
+    maxLength: MAX_LENGTH_MAIN,
     placeholder:
       "e.g. I go by JDI. Came for the AI angle — I think autonomous agents building onchain apps is the real unlock...",
   },
@@ -15,6 +20,7 @@ export const QUESTIONS = [
     label: "What does holding CLAWD get you?",
     prompt: "What do you actually get for holding $CLAWD? And what do you wish you got?",
     type: "textarea",
+    maxLength: MAX_LENGTH_MAIN,
     placeholder:
       "e.g. Right now mostly early access and vibes. What I wish I had: rev share, token-gated AI tools, something real...",
   },
@@ -24,6 +30,7 @@ export const QUESTIONS = [
     prompt:
       "If we stake $CLAWD, how long should it be locked up? What percent should you earn on it? And what percent should we burn?\n\n(Both the earned and burned amounts come straight out of the treasury in $CLAWD.)\n\nFor example: 3 month lockup, 1% earned, 2% burned.",
     type: "textarea",
+    maxLength: MAX_LENGTH_MAIN,
     placeholder: "e.g. 3 month lockup, 1% earned, 2% burned — I'd want a real commitment before seeing any yield...",
   },
   {
@@ -59,6 +66,7 @@ export const QUESTIONS = [
     prompt:
       "What would make you immediately vote NO on a proposal, no matter how it was packaged? What's a line you'd never cross?",
     type: "textarea",
+    maxLength: MAX_LENGTH_MAIN,
     placeholder:
       "e.g. Any marketing/KOL spend. Treasury funds going to teams with no track record. Anything that concentrates power...",
   },
@@ -68,6 +76,7 @@ export const QUESTIONS = [
     prompt:
       "If you could wave a magic wand and have one thing happen for $CLAWD — anything at all, no constraints, no 'is it realistic' — what would it be?",
     type: "textarea",
+    maxLength: MAX_LENGTH_MAIN,
     placeholder:
       "e.g. Every AI agent in the ecosystem runs on CLAWD. Or: $CLAWD becomes the default fuel for onchain apps...",
   },
@@ -77,6 +86,7 @@ export const QUESTIONS = [
     prompt:
       "What do you actually want $CLAWD to become in 1 year? Not what you think it will — what do you want? And what's your biggest concern about whether it gets there?",
     type: "textarea",
+    maxLength: MAX_LENGTH_MAIN,
     placeholder:
       "e.g. I want it to be the go-to token for AI compute on Base. My concern is that the AI narrative fades before the apps generate real revenue...",
   },

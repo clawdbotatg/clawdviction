@@ -3,7 +3,18 @@
 import { useEffect, useState } from "react";
 import type { AuthData } from "~~/hooks/useAuth";
 import { authFetch } from "~~/lib/authFetch";
-import { QUESTIONS } from "~~/lib/questions";
+import { MAX_LENGTH_MAIN, MAX_LENGTH_NOTES, QUESTIONS } from "~~/lib/questions";
+
+const CharCounter = ({ value, max }: { value: string; max: number }) => {
+  const len = value?.length ?? 0;
+  const pct = len / max;
+  const color = pct >= 1 ? "text-error" : pct >= 0.85 ? "text-warning" : "text-base-content/30";
+  return (
+    <span className={`text-xs tabular-nums ${color}`}>
+      {len} / {max}
+    </span>
+  );
+};
 
 interface Answers {
   [key: string]: string;
@@ -143,12 +154,18 @@ export const OnboardingInterview = ({ address, authData, onComplete }: Onboardin
 
           {/* Textarea */}
           {currentQ.type === "textarea" && (
-            <textarea
-              className="textarea textarea-bordered rounded-none [border-radius:0] w-full h-36 text-base"
-              placeholder={currentQ.placeholder}
-              value={answers[currentQ.id] ?? ""}
-              onChange={e => setAnswer(e.target.value)}
-            />
+            <div>
+              <textarea
+                className="textarea textarea-bordered rounded-none [border-radius:0] w-full h-36 text-base"
+                placeholder={currentQ.placeholder}
+                maxLength={currentQ.maxLength ?? MAX_LENGTH_MAIN}
+                value={answers[currentQ.id] ?? ""}
+                onChange={e => setAnswer(e.target.value)}
+              />
+              <div className="flex justify-end mt-1">
+                <CharCounter value={answers[currentQ.id] ?? ""} max={currentQ.maxLength ?? MAX_LENGTH_MAIN} />
+              </div>
+            </div>
           )}
 
           {/* Checklist */}
@@ -174,9 +191,13 @@ export const OnboardingInterview = ({ address, authData, onComplete }: Onboardin
                   <textarea
                     className="textarea textarea-bordered rounded-none [border-radius:0] w-full h-24 text-base"
                     placeholder={currentQ.subPlaceholder}
+                    maxLength={MAX_LENGTH_NOTES}
                     value={answers[`${currentQ.id}_notes`] ?? ""}
                     onChange={e => setAnswers(prev => ({ ...prev, [`${currentQ.id}_notes`]: e.target.value }))}
                   />
+                  <div className="flex justify-end mt-1">
+                    <CharCounter value={answers[`${currentQ.id}_notes`] ?? ""} max={MAX_LENGTH_NOTES} />
+                  </div>
                 </div>
               )}
             </div>
@@ -208,9 +229,13 @@ export const OnboardingInterview = ({ address, authData, onComplete }: Onboardin
                   <textarea
                     className="textarea textarea-bordered rounded-none [border-radius:0] w-full h-28 text-base"
                     placeholder={currentQ.subPlaceholder}
+                    maxLength={MAX_LENGTH_NOTES}
                     value={answers[`${currentQ.id}_notes`] ?? ""}
                     onChange={e => setAnswers(prev => ({ ...prev, [`${currentQ.id}_notes`]: e.target.value }))}
                   />
+                  <div className="flex justify-end mt-1">
+                    <CharCounter value={answers[`${currentQ.id}_notes`] ?? ""} max={MAX_LENGTH_NOTES} />
+                  </div>
                 </div>
               )}
             </div>
