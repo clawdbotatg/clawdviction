@@ -120,16 +120,16 @@ export async function GET(request: NextRequest) {
 
           await sql`
             UPDATE clawdviction_balances SET
-              balance = ${newBalance.toString()}::bigint,
+              balance = ${newBalance.toString()}::numeric,
               last_accrued_at = ${now.toISOString()},
-              accrual_rate = ${currentTotalStaked.toString()}::bigint,
-              total_earned = ${newTotalEarned.toString()}::bigint
+              accrual_rate = ${currentTotalStaked.toString()}::numeric,
+              total_earned = ${newTotalEarned.toString()}::numeric
             WHERE wallet = ${w}`;
         } else {
           // New wallet — seed with on-chain data
           await sql`
             INSERT INTO clawdviction_balances (wallet, balance, last_accrued_at, accrual_rate, total_earned, total_spent)
-            VALUES (${w}, ${totalEarnedFromChain.toString()}::bigint, ${now.toISOString()}, ${currentTotalStaked.toString()}::bigint, ${totalEarnedFromChain.toString()}::bigint, 0)`;
+            VALUES (${w}, ${totalEarnedFromChain.toString()}::numeric, ${now.toISOString()}, ${currentTotalStaked.toString()}::numeric, ${totalEarnedFromChain.toString()}::numeric, 0)`;
         }
 
         processed++;

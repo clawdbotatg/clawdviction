@@ -132,7 +132,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       try {
         await sql`
           INSERT INTO clawdviction_balances (wallet, balance, last_accrued_at, accrual_rate, total_earned, total_spent)
-          VALUES (${walletLower}, ${totalCv.toString()}::bigint, ${now.toISOString()}, ${currentTotalStaked.toString()}::bigint, ${totalCv.toString()}::bigint, 0)
+          VALUES (${walletLower}, ${totalCv.toString()}::numeric, ${now.toISOString()}, ${currentTotalStaked.toString()}::numeric, ${totalCv.toString()}::numeric, 0)
           ON CONFLICT (wallet) DO NOTHING`;
       } catch (e) {
         console.error("Error seeding DB:", e);

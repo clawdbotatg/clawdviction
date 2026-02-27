@@ -142,10 +142,10 @@ export async function POST(request: NextRequest) {
           const newTotalSpent = BigInt(row.total_spent) + deduction;
           await sql`
             UPDATE clawdviction_balances SET
-              balance = ${newBalance.toString()}::bigint,
+              balance = ${newBalance.toString()}::numeric,
               last_accrued_at = NOW(),
-              total_earned = ${newTotalEarned.toString()}::bigint,
-              total_spent = ${newTotalSpent.toString()}::bigint
+              total_earned = ${newTotalEarned.toString()}::numeric,
+              total_spent = ${newTotalSpent.toString()}::numeric
             WHERE wallet = ${wallet.toLowerCase()}`;
         }
       } catch (e) {
