@@ -11,13 +11,14 @@
 - **Neon Postgres** — env vars in `packages/nextjs/.env.local`
 - Tables: `larva_seeds` (onboarding), `chat_messages`, `memory_snapshots`
 - ⚠️ Wallet addresses stored **mixed-case (checksummed)** — never use `lower()` when querying
+- `larva_seeds.identity_brief` column exists but is now always NULL — raw answers used instead
 
 ## Architecture
 - ClawdViction score read directly from contract via Next.js API (`/api/clawdviction/[wallet]`)
 - Onboarding answers → Neon via `/api/onboard/[wallet]`
 - Chat history → Neon via `/api/chat/history/[wallet]`
 - AI chat → Anthropic (Haiku) called directly from Next.js API
-- Auto-greeting on first chat: `/api/chat/greet` — reads onboarding brief, generates personalized hello
+- Auto-greeting on first chat: `/api/chat/greet` — reads raw onboarding Q&A, generates personalized hello
 
 ## Auth (wallet signature)
 - `hooks/useAuth.ts` — signs message on first visit, stores in localStorage for 1 week
@@ -27,6 +28,22 @@
 - Protected routes: `/api/chat`, `/api/chat/greet`, `/api/chat/history/[wallet]`, `/api/onboard/[wallet]`, `/api/larva/[wallet]/launch`
 - Public routes: `/api/clawdviction/[wallet]`, `/api/larva/[wallet]/status`
 
+## Onboarding → Larva Memory (IMPORTANT)
+- **No summarization** — raw Q&A injected directly into system prompt
+- `lib/questions.ts` — shared file: exports `QUESTIONS` array + `formatAnswersAsQA()` helper
+- `formatAnswersAsQA()` formats answers with full question prompts + labeled answers → multi-section string
+- Onboard POST: saves raw `answers` JSONB to DB, sets `completed = true`, NO LLM call
+- Chat + Greet routes: fetch `answers` from DB, call `formatAnswersAsQA()`, inject into system prompt
+- localStorage cache key: `clawdviction-onboarded-${address}` = "true" (was `clawdviction-brief-${address}`)
+- `identityBrief` state removed from chat page — server owns the Q&A context entirely
+
+## Character Limits (onboarding)
+- Main textarea answers: **500 chars** (`MAX_LENGTH_MAIN`)
+- Sub-prompt notes (checklist "anything else" / scale "why that number"): **300 chars** (`MAX_LENGTH_NOTES`)
+- Constants defined in `lib/questions.ts`
+- `CharCounter` component inline in `OnboardingInterview.tsx`: shows `X / max`, warning at 85%, error at 100%
+- Hard-enforced via HTML `maxLength` attribute
+
 ## Key UX flows
 - **Nav:** Home → Stake → Chat → About
 - **Chat page** is the single entry point:
@@ -35,28 +52,21 @@
   3. Not signed → "Connect to $CLAWD Larvae" sign-in screen
   4. All data loading → spinner (clawdviction + onboard + history all gate the spinner)
   5. Not enough ClawdViction (<1M token-seconds) → stake CTA
-  6. Onboarding not complete → interview inline
-  7. Done → chat with auto-greeting from larva on first visit
-- **Stake + Home** — same spinner pattern (mounted + walletStatus reconnecting gate)
+  6. Larva not launched → "Launch Larva" screen
+  7. Onboarding not complete → interview inline
+  8. Done → chat with auto-greeting from larva on first visit
 
 ## Known issue (unresolved, not worth more tokens)
 - Stake CTA flashes briefly on chat page before chat loads
 - Root cause: clawdviction API sometimes returns 0 on first call before correcting on interval
-- Attempts: null gate, clawdviction reset on auth, Promise.allSettled — all partially helped but flash persists
 - May resolve itself with better RPC (Alchemy key now set properly)
 
 ## Onboarding interview (8 questions)
 - File: `packages/nextjs/components/OnboardingInterview.tsx`
+- Questions defined in `packages/nextjs/lib/questions.ts` (imported by both component + server routes)
 - Draft autosaved to localStorage on every keystroke (key: `clawdviction-onboard-draft-${address}`)
-- **8 questions:**
-  1. Who are you
-  2. What do you get for holding CLAWD? What do you wish you got?
-  3. Staking lockup & burn split (e.g. 3 month lockup, 1% earned, 2% burned — paid from treasury)
-  4. What should we build (broad categories: games, AI agents, trading, social, revenue/burns)
-  5. Risk tolerance (1–5 scale)
-  6. Hard lines
-  7. Magic wand
-  8. Vision & honest concern (1 year)
+- **8 questions (ids):** identity, holder_value, staking_mechanics, build_priorities, risk_tolerance, hard_lines, magic_wand, vision_concern
+- build_priorities has checklist + notes sub-field; risk_tolerance has scale (1-5) + notes sub-field
 
 ## Staking mechanics
 - `stake(amount)` → creates new slot in `stakes[user][]` array
@@ -79,4 +89,11 @@
 ## Git
 - Repo: `https://github.com/clawdbotatg/clawdviction`
 - Auto-deploys to `clawdviction.vercel.app` on push to main
-- Latest commit: `82faeb6` (2026-02-26)
+- Latest commit: `fefd172` (2026-02-26) — char limits on onboarding Q&A
+
+## Latest commits (2026-02-26)
+- `fefd172` — char limits on onboarding Q&A with live counter
+- `6c24bdb` — inject full raw onboarding Q&A into larva system prompt (no more summaries)
+- `fd6969f` — update CONTEXT.md
+- `82faeb6` — base64-encode auth message header, reset clawdviction on auth
+- `a5390d8` — auth, chat UX, onboarding polish, loader fixes, alchemy RPC
