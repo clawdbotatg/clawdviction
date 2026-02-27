@@ -52,6 +52,16 @@ export async function initDb() {
       updated_at TIMESTAMPTZ DEFAULT NOW()
     )`;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS clawdviction_balances (
+      wallet TEXT PRIMARY KEY,
+      balance BIGINT NOT NULL DEFAULT 0,
+      last_accrued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      accrual_rate BIGINT NOT NULL DEFAULT 0,
+      total_earned BIGINT NOT NULL DEFAULT 0,
+      total_spent BIGINT NOT NULL DEFAULT 0
+    )`;
+
   dbInitialized = true;
 }
 

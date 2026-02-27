@@ -48,7 +48,11 @@ const StakePage: NextPage = () => {
   const [mounted, setMounted] = useState(false);
   const [stakeAmount, setStakeAmount] = useState("");
   const [clawdvictionScore, setClawdvictionScore] = useState<string | null>(null);
-  const [, setActiveStakesFromBackend] = useState<any[]>([]);
+  const [cvAccrualRate, setCvAccrualRate] = useState<string>("0");
+  const [cvLastAccruedAt, setCvLastAccruedAt] = useState<string | null>(null);
+  const [cvBalance, setCvBalance] = useState<string>("0");
+  const [liveClawdviction, setLiveClawdviction] = useState<string | null>(null);
+  const [, setActiveStakesFromBackend] = useState<unknown[]>([]);
   // Real stake indices from the contract — display index !== contract index after any unstake
   const [realStakeIndices, setRealStakeIndices] = useState<number[]>([]);
 
@@ -186,6 +190,9 @@ const StakePage: NextPage = () => {
       } else {
         setClawdvictionScore("0");
       }
+      if (data.accrualRate != null) setCvAccrualRate(data.accrualRate);
+      if (data.lastAccruedAt != null) setCvLastAccruedAt(data.lastAccruedAt);
+      if (data.balance != null) setCvBalance(data.balance);
       setActiveStakesFromBackend(data.activeStakes || []);
     } catch {
       // Leave as null on failure — interval will retry
@@ -194,9 +201,26 @@ const StakePage: NextPage = () => {
 
   useEffect(() => {
     fetchClawdviction();
-    const interval = setInterval(fetchClawdviction, 2000);
+    const interval = setInterval(fetchClawdviction, 30000);
     return () => clearInterval(interval);
   }, [fetchClawdviction]);
+
+  // Live optimistic counter — ticks every second
+  useEffect(() => {
+    if (!cvLastAccruedAt || !cvBalance) return;
+    const rate = BigInt(cvAccrualRate);
+    const base = BigInt(cvBalance);
+    const accrueStart = new Date(cvLastAccruedAt).getTime();
+
+    const tick = () => {
+      const elapsed = BigInt(Math.max(0, Math.floor((Date.now() - accrueStart) / 1000)));
+      const current = base + rate * elapsed;
+      setLiveClawdviction(current.toString());
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [cvBalance, cvAccrualRate, cvLastAccruedAt]);
 
   // Determine state
   const isWrongNetwork = chain && chain.id !== targetNetwork.id;
@@ -314,7 +338,9 @@ const StakePage: NextPage = () => {
         </div>
         <div className="stat bg-base-200 rounded-xl shadow">
           <div className="stat-title">Your ClawdViction</div>
-          <div className="stat-value text-error text-2xl">{formatClawdviction(clawdvictionScore ?? "0")} 🦀</div>
+          <div className="stat-value text-error text-2xl">
+            {formatClawdviction(liveClawdviction ?? clawdvictionScore ?? "0")} 🦀
+          </div>
         </div>
         <div className="stat bg-base-200 rounded-xl shadow">
           <div className="stat-title">Total Staked (All)</div>

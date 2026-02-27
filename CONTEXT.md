@@ -97,3 +97,31 @@
 - `fd6969f` — update CONTEXT.md
 - `82faeb6` — base64-encode auth message header, reset clawdviction on auth
 - `a5390d8` — auth, chat UX, onboarding polish, loader fixes, alchemy RPC
+
+## Off-Chain ClawdViction System (2026-02-26)
+
+Architecture change: ClawdViction scores moved from on-chain reads to off-chain Neon Postgres.
+
+### New DB Table: `clawdviction_balances`
+- `wallet` (PK), `balance` (materialized token-seconds), `last_accrued_at`, `accrual_rate` (current staked tokens for optimistic frontend), `total_earned`, `total_spent`
+
+### Cron: `/api/cron/accrue` (every 1 min via Vercel Cron)
+- Iterates all wallets from `larva_seeds` + `clawdviction_balances`
+- Reads active stakes from contract, calculates pending token-seconds, upserts balances
+- Auth: `CRON_SECRET` env var
+
+### API: `/api/clawdviction/[wallet]`
+- Reads from DB (with contract fallback + seeding for first-time users)
+- Returns `balance`, `accrualRate`, `lastAccruedAt` for optimistic frontend counter
+
+### Spending
+- Chat messages deduct 10,000 token-seconds per message from balance
+- Materializes pending accrual before deducting, floors at 0
+
+### Frontend
+- Optimistic live counter on stake page — ticks up every second using `balance + accrualRate * elapsed`
+- Polling reduced to 30s (was 2s) since counter is client-side
+- `vercel.json` added at `packages/nextjs/vercel.json` for cron config
+
+### Env Vars Needed
+- `CRON_SECRET` — for Vercel cron auth (add to Vercel env vars)

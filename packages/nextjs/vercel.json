@@ -1,3 +1,8 @@
 {
-  "installCommand": "yarn install"
+  "crons": [
+    {
+      "path": "/api/cron/accrue",
+      "schedule": "* * * * *"
+    }
+  ]
 }

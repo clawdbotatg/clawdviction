@@ -123,6 +123,35 @@ export async function POST(request: NextRequest) {
       await sql`
         INSERT INTO chat_messages (wallet, role, content) VALUES (${wallet}, 'assistant', ${assistantMessage})`;
 
+      // Deduct ClawdViction for this message (10,000 token-seconds)
+      try {
+        const CHAT_COST = 10000n;
+        const cvRow = await sql`
+          SELECT balance, accrual_rate, last_accrued_at, total_spent
+          FROM clawdviction_balances WHERE wallet = ${wallet}`;
+        if (cvRow.rows.length > 0) {
+          const row = cvRow.rows[0];
+          const oldBalance = BigInt(row.balance);
+          const accrualRate = BigInt(row.accrual_rate);
+          const lastAccruedAt = new Date(row.last_accrued_at);
+          const elapsed = BigInt(Math.max(0, Math.floor((Date.now() - lastAccruedAt.getTime()) / 1000)));
+          const pending = accrualRate * elapsed;
+          const materialized = oldBalance + pending;
+          const newBalance = materialized > CHAT_COST ? materialized - CHAT_COST : 0n;
+          const newTotalSpent = BigInt(row.total_spent) + (materialized > CHAT_COST ? CHAT_COST : materialized);
+          const nowISO = new Date().toISOString();
+          await sql`
+            UPDATE clawdviction_balances SET
+              balance = ${newBalance.toString()},
+              last_accrued_at = ${nowISO},
+              total_earned = total_earned + ${pending.toString()},
+              total_spent = ${newTotalSpent.toString()}
+            WHERE wallet = ${wallet}`;
+        }
+      } catch (e) {
+        console.error("ClawdViction deduction error:", e);
+      }
+
       // Fire-and-forget memory compression check
       const countResult = await sql`SELECT COUNT(*) as cnt FROM chat_messages WHERE wallet = ${wallet}`;
       const count = parseInt(countResult.rows[0].cnt);
