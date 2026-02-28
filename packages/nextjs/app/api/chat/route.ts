@@ -1,10 +1,127 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createPublicClient, formatUnits, http } from "viem";
+import { base } from "viem/chains";
 import { compressMemory, initDb, isDbAvailable, sql } from "~~/lib/db";
 import { LARVA_BASE_PROMPT } from "~~/lib/larvaContext";
 import { formatAnswersAsQA } from "~~/lib/questions";
 import { verifyAuth } from "~~/lib/verifyAuth";
 
 const LARVA_SYSTEM_PROMPT = LARVA_BASE_PROMPT;
+
+const STAKING_CONTRACT = "0xFE69980a1203d664488A73aE806514d2a04C1F8a" as const;
+const STAKING_ABI = [
+  { name: "totalSupplyStaked", type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+] as const;
+
+function getBaseClient() {
+  return createPublicClient({
+    chain: base,
+    transport: http(`https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`),
+  });
+}
+
+async function getTotalStaked(): Promise<string> {
+  const client = getBaseClient();
+  const raw = await client.readContract({
+    address: STAKING_CONTRACT,
+    abi: STAKING_ABI,
+    functionName: "totalSupplyStaked",
+  });
+  return formatUnits(raw, 18);
+}
+
+const ANTHROPIC_TOOLS = [
+  {
+    name: "get_clawd_token_stats",
+    description: "Fetch live CLAWD token data including price (if available) and total staked CLAWD from on-chain.",
+    input_schema: { type: "object" as const, properties: {}, required: [] as string[] },
+  },
+  {
+    name: "get_wallet_cv_score",
+    description: "Look up a wallet's ClawdViction score, accrual rate, and balance.",
+    input_schema: {
+      type: "object" as const,
+      properties: { wallet: { type: "string", description: "Ethereum address" } },
+      required: ["wallet"],
+    },
+  },
+  {
+    name: "get_ecosystem_stats",
+    description: "Get a snapshot of the CLAWD ecosystem: total staked, number of CV wallets, and other stats.",
+    input_schema: { type: "object" as const, properties: {}, required: [] as string[] },
+  },
+];
+
+async function executeToolCall(name: string, input: Record<string, unknown>): Promise<string> {
+  try {
+    if (name === "get_clawd_token_stats") {
+      const results: Record<string, unknown> = {};
+      // CoinGecko (best effort)
+      try {
+        const cg = await fetch("https://api.coingecko.com/api/v3/coins/clawd", { signal: AbortSignal.timeout(5000) });
+        if (cg.ok) {
+          const data = await cg.json();
+          results.price_usd = data.market_data?.current_price?.usd ?? null;
+          results.market_cap = data.market_data?.market_cap?.usd ?? null;
+          results.volume_24h = data.market_data?.total_volume?.usd ?? null;
+          results.price_change_24h_pct = data.market_data?.price_change_percentage_24h ?? null;
+        } else {
+          results.coingecko = "not listed or unavailable";
+        }
+      } catch {
+        results.coingecko = "unavailable";
+      }
+      // On-chain staked
+      try {
+        results.total_staked_clawd = await getTotalStaked();
+      } catch (e) {
+        results.total_staked_clawd = `error: ${e instanceof Error ? e.message : String(e)}`;
+      }
+      return JSON.stringify(results);
+    }
+
+    if (name === "get_wallet_cv_score") {
+      const wallet = (input.wallet as string) || "";
+      const res = await fetch(`http://localhost:3000/api/clawdviction/${wallet}`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) return JSON.stringify({ error: `API returned ${res.status}` });
+      return JSON.stringify(await res.json());
+    }
+
+    if (name === "get_ecosystem_stats") {
+      const results: Record<string, unknown> = {};
+      try {
+        results.total_staked_clawd = await getTotalStaked();
+      } catch (e) {
+        results.total_staked_clawd = `error: ${e instanceof Error ? e.message : String(e)}`;
+      }
+      try {
+        const walletCount = await sql`SELECT COUNT(*) as cnt FROM clawdviction_balances`;
+        results.cv_wallet_count = parseInt(walletCount.rows[0].cnt);
+      } catch {
+        results.cv_wallet_count = "unavailable";
+      }
+      try {
+        const msgCount = await sql`SELECT COUNT(DISTINCT wallet) as cnt FROM chat_messages`;
+        results.active_chat_wallets = parseInt(msgCount.rows[0].cnt);
+      } catch {
+        results.active_chat_wallets = "unavailable";
+      }
+      try {
+        const totalCV = await sql`SELECT SUM(balance::numeric) as total FROM clawdviction_balances`;
+        results.total_cv_balance = totalCV.rows[0].total ?? "0";
+      } catch {
+        results.total_cv_balance = "unavailable";
+      }
+      return JSON.stringify(results);
+    }
+
+    return JSON.stringify({ error: "unknown tool" });
+  } catch (e) {
+    return JSON.stringify({ error: e instanceof Error ? e.message : String(e) });
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -108,23 +225,55 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-haiku-4-5",
-        max_tokens: 400,
-        system: systemPrompt,
-        messages: history,
-      }),
-    });
+    // Anthropic API call with tool use support
+    const apiHeaders = {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    };
 
-    const data = await response.json();
-    const assistantMessage = data.content?.[0]?.text || "🦞 *confused clicking*";
+    const currentMessages = [...history];
+    let assistantMessage = "🦞 *confused clicking*";
+
+    // Tool use loop (max 3 rounds to prevent runaway)
+    for (let round = 0; round < 3; round++) {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: apiHeaders,
+        body: JSON.stringify({
+          model: "claude-haiku-4-5",
+          max_tokens: round === 0 ? 600 : 800,
+          system: systemPrompt,
+          messages: currentMessages,
+          tools: ANTHROPIC_TOOLS,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.stop_reason === "tool_use") {
+        // Add assistant message with tool_use blocks
+        currentMessages.push({ role: "assistant", content: data.content });
+
+        // Execute each tool call and build tool_result blocks
+        const toolResults: { type: "tool_result"; tool_use_id: string; content: string }[] = [];
+        for (const block of data.content) {
+          if (block.type === "tool_use") {
+            const result = await executeToolCall(block.name, block.input as Record<string, unknown>);
+            toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
+          }
+        }
+        currentMessages.push({ role: "user", content: toolResults as unknown as string });
+        continue;
+      }
+
+      // Extract final text
+      if (Array.isArray(data.content)) {
+        const textBlock = data.content.find((b: { type: string }) => b.type === "text");
+        if (textBlock) assistantMessage = textBlock.text;
+      }
+      break;
+    }
 
     if (dbOk) {
       // Save assistant reply
