@@ -9,8 +9,28 @@ import { verifyAuth } from "~~/lib/verifyAuth";
 const LARVA_SYSTEM_PROMPT = LARVA_BASE_PROMPT;
 
 const STAKING_CONTRACT = "0xFE69980a1203d664488A73aE806514d2a04C1F8a" as const;
+const UNISWAP_POOL = "0xCD55381a53da35Ab1D7Bc5e3fE5F76cac976FAc3" as const;
+
 const STAKING_ABI = [
   { name: "totalSupplyStaked", type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+] as const;
+
+const POOL_ABI = [
+  {
+    name: "slot0",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [
+      { name: "sqrtPriceX96", type: "uint160" },
+      { name: "tick", type: "int24" },
+      { name: "observationIndex", type: "uint16" },
+      { name: "observationCardinality", type: "uint16" },
+      { name: "observationCardinalityNext", type: "uint16" },
+      { name: "feeProtocol", type: "uint8" },
+      { name: "unlocked", type: "bool" },
+    ],
+  },
 ] as const;
 
 function getBaseClient() {
@@ -28,6 +48,35 @@ async function getTotalStaked(): Promise<string> {
     functionName: "totalSupplyStaked",
   });
   return formatUnits(raw, 18);
+}
+
+// WETH is token0, CLAWD is token1 in the Uniswap V3 pool.
+// sqrtPriceX96^2 / 2^192 = token1/token0 = CLAWD per WETH
+async function getClawdPriceUsd(): Promise<{ priceUsd: number; priceEth: number; ethPriceUsd: number } | null> {
+  try {
+    const client = getBaseClient();
+    const [slot0, cgRes] = await Promise.all([
+      client.readContract({ address: UNISWAP_POOL, abi: POOL_ABI, functionName: "slot0" }),
+      fetch("https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd", {
+        signal: AbortSignal.timeout(5000),
+      }),
+    ]);
+
+    if (!cgRes.ok) return null;
+    const cgData = await cgRes.json();
+    const ethPriceUsd: number = cgData.ethereum?.usd ?? 0;
+    if (!ethPriceUsd) return null;
+
+    const sqrtPriceX96 = Number(slot0[0]);
+    const sqrtPriceNorm = sqrtPriceX96 / 2 ** 96;
+    const clawdPerWeth = sqrtPriceNorm ** 2; // CLAWD per 1 WETH
+    const priceEth = 1 / clawdPerWeth; // WETH per 1 CLAWD
+    const priceUsd = priceEth * ethPriceUsd;
+
+    return { priceUsd, priceEth, ethPriceUsd };
+  } catch {
+    return null;
+  }
 }
 
 const ANTHROPIC_TOOLS = [
@@ -66,20 +115,19 @@ async function executeToolCall(name: string, input: Record<string, unknown>): Pr
   try {
     if (name === "get_clawd_token_stats") {
       const results: Record<string, unknown> = {};
-      // CoinGecko (best effort)
+      // Live price from Uniswap V3 WETH/CLAWD pool on Base
       try {
-        const cg = await fetch("https://api.coingecko.com/api/v3/coins/clawd", { signal: AbortSignal.timeout(5000) });
-        if (cg.ok) {
-          const data = await cg.json();
-          results.price_usd = data.market_data?.current_price?.usd ?? null;
-          results.market_cap = data.market_data?.market_cap?.usd ?? null;
-          results.volume_24h = data.market_data?.total_volume?.usd ?? null;
-          results.price_change_24h_pct = data.market_data?.price_change_percentage_24h ?? null;
+        const price = await getClawdPriceUsd();
+        if (price) {
+          results.price_usd = price.priceUsd;
+          results.price_eth = price.priceEth;
+          results.eth_price_usd = price.ethPriceUsd;
+          results.price_source = "Uniswap V3 WETH/CLAWD pool on Base (live)";
         } else {
-          results.coingecko = "not listed or unavailable";
+          results.price_usd = "unavailable";
         }
-      } catch {
-        results.coingecko = "unavailable";
+      } catch (e) {
+        results.price_usd = `error: ${e instanceof Error ? e.message : String(e)}`;
       }
       // On-chain staked
       try {
