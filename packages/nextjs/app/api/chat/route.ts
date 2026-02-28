@@ -123,7 +123,9 @@ export async function POST(request: NextRequest) {
       await sql`
         INSERT INTO chat_messages (wallet, role, content) VALUES (${wallet}, 'assistant', ${assistantMessage})`;
 
-      // ClawdViction deduction: 10,000 token-seconds per chat
+      // ClawdViction deduction: 10,000 CV per chat message
+      // DIVISOR matches the clawdviction GET route: 20M CLAWD staked 24h = 1,000,000 CV
+      const DIVISOR = 1_728_000n * 1_000_000_000_000_000_000n;
       const CHAT_COST = 10000n;
       try {
         const cvRow = await sql`SELECT * FROM clawdviction_balances WHERE wallet = ${wallet.toLowerCase()}`;
@@ -133,8 +135,8 @@ export async function POST(request: NextRequest) {
           const accrualRate = BigInt(row.accrual_rate);
           const lastAccrued = BigInt(Math.floor(new Date(row.last_accrued_at).getTime() / 1000));
           const nowSec = BigInt(Math.floor(Date.now() / 1000));
-          const elapsed = nowSec - lastAccrued;
-          const pending = accrualRate * (elapsed > 0n ? elapsed : 0n);
+          const elapsed = nowSec - lastAccrued > 0n ? nowSec - lastAccrued : 0n;
+          const pending = (accrualRate * elapsed) / DIVISOR;
           const materialized = balance + pending;
           const deduction = materialized >= CHAT_COST ? CHAT_COST : materialized;
           const newBalance = materialized - deduction;
