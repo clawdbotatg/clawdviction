@@ -50,6 +50,16 @@ const ANTHROPIC_TOOLS = [
     description: "Get a snapshot of the CLAWD ecosystem: total staked, number of CV wallets, and other stats.",
     input_schema: { type: "object" as const, properties: {}, required: [] as string[] },
   },
+  {
+    name: "fetch_url",
+    description:
+      "Fetch and read the content of a URL. Use this to look up live info from CLAWD ecosystem sites or any relevant URL. Returns page text content.",
+    input_schema: {
+      type: "object" as const,
+      properties: { url: { type: "string", description: "The URL to fetch" } },
+      required: ["url"],
+    },
+  },
 ];
 
 async function executeToolCall(name: string, input: Record<string, unknown>): Promise<string> {
@@ -115,6 +125,26 @@ async function executeToolCall(name: string, input: Record<string, unknown>): Pr
         results.total_cv_balance = "unavailable";
       }
       return JSON.stringify(results);
+    }
+
+    if (name === "fetch_url") {
+      const url = input.url as string;
+      if (!url) return JSON.stringify({ error: "missing url" });
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(10000),
+        headers: { "User-Agent": "ClawdViction-Larva/1.0 (+https://clawdbotatg.eth.link)" },
+      });
+      if (!res.ok) return JSON.stringify({ error: `HTTP ${res.status}` });
+      let text = await res.text();
+      // Strip HTML tags, scripts, styles
+      text = text.replace(/<script[\s\S]*?<\/script>/gi, " ");
+      text = text.replace(/<style[\s\S]*?<\/style>/gi, " ");
+      text = text.replace(/<[^>]+>/g, " ");
+      // Collapse whitespace
+      text = text.replace(/\s+/g, " ").trim();
+      // Truncate
+      if (text.length > 3000) text = text.slice(0, 3000) + "…";
+      return JSON.stringify({ url, content: text });
     }
 
     return JSON.stringify({ error: "unknown tool" });
