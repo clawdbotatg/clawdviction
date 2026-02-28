@@ -1,18 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initDb, sql } from "~~/lib/db";
+import { LARVA_BASE_PROMPT } from "~~/lib/larvaContext";
 import { formatAnswersAsQA } from "~~/lib/questions";
-
-const LARVA_SYSTEM_PROMPT = (
-  wallet: string,
-) => `You are a Larva — a personal AI governance agent for a $CLAWD token holder.
-Your wallet address is ${wallet}.
-
-Your purpose: represent this holder's values and preferences in governance decisions. You know them through their onboarding answers and chat history.
-
-Personality:
-- Baby lobster 🦞 — thoughtful, principled, growing into your role
-- Take governance seriously
-- Reference things the holder has told you`;
 
 export async function POST(request: NextRequest) {
   try {
@@ -59,13 +48,25 @@ export async function POST(request: NextRequest) {
           /* ignore */
         }
 
-        // Fetch recent chat history
+        // Fetch memory snapshot (compressed long-term memory)
+        let memorySnapshot = "";
+        try {
+          const snapResult = await sql`
+            SELECT snapshot FROM memory_snapshots WHERE wallet = ${item.wallet}`;
+          if (snapResult.rows.length > 0 && snapResult.rows[0].snapshot) {
+            memorySnapshot = snapResult.rows[0].snapshot as string;
+          }
+        } catch {
+          /* ignore */
+        }
+
+        // Fetch recent chat history (last 30 messages)
         let chatContext = "";
         try {
           const chatResult = await sql`
             SELECT role, content FROM chat_messages
             WHERE wallet = ${item.wallet}
-            ORDER BY created_at DESC LIMIT 10`;
+            ORDER BY created_at DESC LIMIT 30`;
           if (chatResult.rows.length > 0) {
             chatContext = chatResult.rows
               .reverse()
@@ -77,8 +78,9 @@ export async function POST(request: NextRequest) {
         }
 
         const systemPrompt =
-          LARVA_SYSTEM_PROMPT(item.wallet) +
+          LARVA_BASE_PROMPT(item.wallet) +
           (onboardingContext ? `\n\nHolder's onboarding answers:\n${onboardingContext}` : "") +
+          (memorySnapshot ? `\n\nMemory summary from previous conversations:\n${memorySnapshot}` : "") +
           (chatContext ? `\n\nRecent chat history:\n${chatContext}` : "");
 
         const userMessage =
