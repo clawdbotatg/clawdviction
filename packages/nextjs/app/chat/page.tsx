@@ -9,8 +9,7 @@ import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useAuth } from "~~/hooks/useAuth";
 import { authFetch } from "~~/lib/authFetch";
 
-const CLAWDVICTION_THRESHOLD = 300_000n;
-const CHAT_COST = 50_000n; // CV cost per message — matches backend deduction
+const CLAWDVICTION_THRESHOLD = 300_000n; // Must have this much CV to send a message (backend deducts 50K after)
 
 interface Message {
   role: "user" | "assistant";
@@ -124,7 +123,8 @@ const ChatPage: NextPage = () => {
   const hasEnoughClawdviction = cvBig !== null && cvBig >= CLAWDVICTION_THRESHOLD;
   // Once onboarded, always show chat — CV only gates the individual send
   const showChat = hasEnoughClawdviction || onboardComplete === true;
-  const hasEnoughToSend = cvBig !== null && cvBig >= CHAT_COST;
+  // Must be at or above the threshold to send — same rule enforced on backend
+  const hasEnoughToSend = cvBig !== null && cvBig >= CLAWDVICTION_THRESHOLD;
 
   const launchLarva = async () => {
     if (!address) return;
@@ -360,8 +360,9 @@ const ChatPage: NextPage = () => {
             <div className="text-center py-3">
               <p className="text-base-content/70 font-medium mb-1">🦀 Your larva is resting...</p>
               <p className="text-sm text-base-content/50">
-                Each message costs <span className="font-semibold">50K CV</span>. Your balance is regenerating — stake
-                more $CLAWD to speed it up.
+                You need <span className="font-semibold">300K CV</span> to send a message. Each chat costs{" "}
+                <span className="font-semibold">50K CV</span> — your balance is regenerating. Stake more $CLAWD to speed
+                it up.
               </p>
               <Link href="/stake" className="btn btn-sm btn-outline mt-3">
                 Stake More 🦞
@@ -388,7 +389,9 @@ const ChatPage: NextPage = () => {
               </button>
             </div>
           )}
-          {hasEnoughToSend && <p className="text-xs text-base-content/30 text-right mt-1">50K CV per message</p>}
+          {hasEnoughToSend && (
+            <p className="text-xs text-base-content/30 text-right mt-1">costs 50K CV · need 300K to send again</p>
+          )}
         </div>
       </div>
     </div>

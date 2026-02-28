@@ -100,6 +100,28 @@ export async function POST(request: NextRequest) {
         ? `\n\nThis holder completed their onboarding interview. Below are their exact answers — treat these as the foundation of your understanding of who they are:\n\n${onboardingContext}`
         : "");
 
+    // Gate: check CV balance BEFORE calling Haiku — don't burn an API call if they can't afford it
+    if (dbOk) {
+      const DIVISOR_PRE = 1_728_000n * 1_000_000_000_000_000_000n;
+      const SEND_THRESHOLD_PRE = 300_000n;
+      try {
+        const cvPre =
+          await sql`SELECT balance, accrual_rate, last_accrued_at FROM clawdviction_balances WHERE wallet = ${wallet.toLowerCase()}`;
+        if (cvPre.rows.length > 0) {
+          const r = cvPre.rows[0];
+          const elapsed =
+            BigInt(Math.floor(Date.now() / 1000)) - BigInt(Math.floor(new Date(r.last_accrued_at).getTime() / 1000));
+          const materialized =
+            BigInt(r.balance) + (BigInt(r.accrual_rate) * (elapsed > 0n ? elapsed : 0n)) / DIVISOR_PRE;
+          if (materialized < SEND_THRESHOLD_PRE) {
+            return NextResponse.json({ error: "Insufficient CV — need 300K to chat" }, { status: 402 });
+          }
+        }
+      } catch (e) {
+        console.error("CV pre-check error:", e);
+      }
+    }
+
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -123,10 +145,10 @@ export async function POST(request: NextRequest) {
       await sql`
         INSERT INTO chat_messages (wallet, role, content) VALUES (${wallet}, 'assistant', ${assistantMessage})`;
 
-      // ClawdViction deduction: 10,000 CV per chat message
-      // DIVISOR matches the clawdviction GET route: 20M CLAWD staked 24h = 1,000,000 CV
+      // ClawdViction gate + deduction
+      // Must have >= 300K CV to send; deducts 50K after a successful message
       const DIVISOR = 1_728_000n * 1_000_000_000_000_000_000n;
-      const CHAT_COST = 50000n;
+      const CHAT_COST = 50_000n;
       try {
         const cvRow = await sql`SELECT * FROM clawdviction_balances WHERE wallet = ${wallet.toLowerCase()}`;
         if (cvRow.rows.length > 0) {
@@ -138,10 +160,10 @@ export async function POST(request: NextRequest) {
           const elapsed = nowSec - lastAccrued > 0n ? nowSec - lastAccrued : 0n;
           const pending = (accrualRate * elapsed) / DIVISOR;
           const materialized = balance + pending;
-          const deduction = materialized >= CHAT_COST ? CHAT_COST : materialized;
-          const newBalance = materialized - deduction;
+
+          const newBalance = materialized - CHAT_COST;
           const newTotalEarned = BigInt(row.total_earned) + pending;
-          const newTotalSpent = BigInt(row.total_spent) + deduction;
+          const newTotalSpent = BigInt(row.total_spent) + CHAT_COST;
           await sql`
             UPDATE clawdviction_balances SET
               balance = ${newBalance.toString()}::numeric,
