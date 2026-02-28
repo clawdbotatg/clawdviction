@@ -42,7 +42,7 @@ const POOL_ABI = [
 ] as const;
 
 const StakePage: NextPage = () => {
-  const { address: connectedAddress, chain, status: walletStatus } = useAccount();
+  const { address: connectedAddress, chain, connector, status: walletStatus } = useAccount();
   const { targetNetwork } = useTargetNetwork();
   const { switchChain } = useSwitchChain();
   const [mounted, setMounted] = useState(false);
@@ -191,32 +191,78 @@ const StakePage: NextPage = () => {
     return n.toLocaleString();
   };
 
-  // Handlers
-  const openWalletDeepLink = () => {
-    // Only attempt deep link on mobile when no injected provider
-    if (typeof window !== "undefined" && !window.ethereum && /iPhone|iPad|Android/i.test(navigator.userAgent)) {
-      // Use MetaMask universal link as primary, with WalletConnect as fallback
-      window.location.href = `https://metamask.app.link/dapp/${window.location.host}`;
-    }
-  };
+  // --- Mobile deep link helpers (per ethskills.com/qa/SKILL.md) ---
+  // Detect which wallet the user connected with and open it via URL scheme.
+  // Checks connector info, wagmi storage, AND WalletConnect session data
+  // so we never hardcode a single wallet.
+  const openWallet = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (!isMobile || window.ethereum) return; // Skip on desktop or in-app browser
 
+    const allIds = [connector?.id, connector?.name, localStorage.getItem("wagmi.recentConnectorId")]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    let wcWallet = "";
+    try {
+      const wcKey = Object.keys(localStorage).find(k => k.startsWith("wc@2:client"));
+      if (wcKey) wcWallet = (localStorage.getItem(wcKey) || "").toLowerCase();
+    } catch {
+      /* ignore */
+    }
+    const search = `${allIds} ${wcWallet}`;
+
+    const schemes: [string[], string][] = [
+      [["rainbow"], "rainbow://"],
+      [["metamask"], "metamask://"],
+      [["coinbase", "cbwallet"], "cbwallet://"],
+      [["trust"], "trust://"],
+      [["phantom"], "phantom://"],
+    ];
+
+    for (const [keywords, scheme] of schemes) {
+      if (keywords.some(k => search.includes(k))) {
+        window.location.href = scheme;
+        return;
+      }
+    }
+  }, [connector]);
+
+  // writeAndOpen: fire the TX first (sends over WalletConnect), then deep link
+  // after 2s delay so the wallet has time to receive the signing request.
+  // We do NOT await before scheduling the deep link — that would wait for
+  // block confirmation, which is too late.
+  const writeAndOpen = useCallback(
+    <T,>(writeFn: () => Promise<T>): Promise<T> => {
+      const promise = writeFn(); // Fire TX — gas estimation + WC relay
+      setTimeout(openWallet, 2000); // Deep link AFTER request is relayed
+      return promise;
+    },
+    [openWallet],
+  );
+
+  // Handlers
   const handleApprove = async () => {
     if (!stakingContractData?.address || parsedAmount <= 0n) return;
-    await approveWrite({
-      functionName: "approve",
-      args: [stakingContractData.address, parsedAmount],
-    });
-    setTimeout(openWalletDeepLink, 2000);
+    await writeAndOpen(() =>
+      approveWrite({
+        functionName: "approve",
+        args: [stakingContractData.address, parsedAmount],
+      }),
+    );
   };
 
   const handleStake = async () => {
     if (parsedAmount <= 0n) return;
-    await stakeWrite({
-      functionName: "stake",
-      args: [parsedAmount],
-    });
+    await writeAndOpen(() =>
+      stakeWrite({
+        functionName: "stake",
+        args: [parsedAmount],
+      }),
+    );
     setStakeAmount("");
-    setTimeout(openWalletDeepLink, 2000);
   };
 
   const handleUnstake = async (displayIndex: number) => {
@@ -225,10 +271,12 @@ const StakePage: NextPage = () => {
     if (contractIndex == null) return;
     setUnstakingIndex(displayIndex);
     try {
-      await unstakeWrite({
-        functionName: "unstake",
-        args: [contractIndex],
-      });
+      await writeAndOpen(() =>
+        unstakeWrite({
+          functionName: "unstake",
+          args: [contractIndex],
+        }),
+      );
     } finally {
       setUnstakingIndex(null);
     }
