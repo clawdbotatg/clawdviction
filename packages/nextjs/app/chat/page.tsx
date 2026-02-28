@@ -9,7 +9,7 @@ import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useAuth } from "~~/hooks/useAuth";
 import { authFetch } from "~~/lib/authFetch";
 
-const CLAWDVICTION_THRESHOLD = 1_000_000n;
+const CLAWDVICTION_THRESHOLD = 300_000n;
 
 interface Message {
   role: "user" | "assistant";
@@ -258,7 +258,7 @@ const ChatPage: NextPage = () => {
         <div className="bg-base-100/60 backdrop-blur-sm rounded-xl px-6 py-4 mb-6 text-center max-w-md">
           <h2 className="text-2xl font-bold mb-2">Earn More ClawdViction</h2>
           <p className="text-base-content/60">
-            You need 1M clawdviction to unlock your personal larva. Stake $CLAWD and let it grow over time.
+            You need 300K clawdviction to unlock your personal larva. Stake $CLAWD and let it grow over time.
           </p>
         </div>
         <div className="w-full max-w-md mb-4">
