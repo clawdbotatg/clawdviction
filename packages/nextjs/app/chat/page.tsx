@@ -80,22 +80,17 @@ const ChatPage: NextPage = () => {
     setStatusLoaded(true);
   }, [address]);
 
-  // Check onboarding status
+  // Check onboarding status — always check the API (DB is source of truth)
   const checkOnboard = useCallback(async () => {
     if (!address || !authData) return;
-    // Check localStorage first (fast path)
-    const cached = localStorage.getItem(`clawdviction-onboarded-${address}`);
-    if (cached === "true") {
-      setOnboardComplete(true);
-      return;
-    }
     try {
       const res = await authFetch(`/api/onboard/${address}`, authData);
       const data = await res.json();
       if (data.completed) {
         setOnboardComplete(true);
-        localStorage.setItem(`clawdviction-onboarded-${address}`, "true");
       } else {
+        // Clear any stale localStorage cache
+        localStorage.removeItem(`clawdviction-onboarded-${address}`);
         setOnboardComplete(false);
       }
     } catch {
