@@ -184,6 +184,13 @@ const StakePage: NextPage = () => {
     return n.toFixed(0);
   };
 
+  const formatClawd = (value: bigint): string => {
+    const n = Number(formatEther(value));
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+    return n.toLocaleString();
+  };
+
   // Handlers
   const openWalletDeepLink = () => {
     // Only attempt deep link on mobile when no injected provider
@@ -274,9 +281,7 @@ const StakePage: NextPage = () => {
       <div className="grid md:grid-cols-3 gap-4 w-full max-w-3xl mb-8">
         <div className="stat bg-base-200 rounded-xl shadow">
           <div className="stat-title">Your Staked</div>
-          <div className="stat-value text-error text-2xl">
-            {totalStaked ? Number(formatEther(totalStaked)).toLocaleString() : "0"} CLAWD
-          </div>
+          <div className="stat-value text-error text-2xl">{totalStaked ? formatClawd(totalStaked) : "0"} CLAWD</div>
           {clawdUsdPrice && totalStaked && totalStaked > 0n && (
             <div className="stat-desc">
               $
@@ -294,9 +299,7 @@ const StakePage: NextPage = () => {
         </div>
         <div className="stat bg-base-200 rounded-xl shadow">
           <div className="stat-title">Total Staked (All)</div>
-          <div className="stat-value text-2xl">
-            {totalSupplyStaked ? Number(formatEther(totalSupplyStaked)).toLocaleString() : "0"}
-          </div>
+          <div className="stat-value text-2xl">{totalSupplyStaked ? formatClawd(totalSupplyStaked) : "0"}</div>
         </div>
       </div>
 
@@ -314,7 +317,7 @@ const StakePage: NextPage = () => {
         <div className="card-body">
           <h2 className="card-title">Stake Tokens</h2>
           <p className="text-sm text-base-content/60 mb-4">
-            Balance: {clawdBalance ? Number(formatEther(clawdBalance)).toLocaleString() : "0"} CLAWD
+            Balance: {clawdBalance ? formatClawd(clawdBalance) : "0"} CLAWD
             {clawdUsdPrice && clawdBalance && clawdBalance > 0n && (
               <span className="ml-1">(${(Number(formatEther(clawdBalance)) * clawdUsdPrice).toFixed(2)})</span>
             )}
@@ -396,7 +399,7 @@ const StakePage: NextPage = () => {
               {activeStakesData[0].map((amount: bigint, i: number) => (
                 <div key={i} className="flex items-center justify-between bg-base-100 rounded-lg p-3">
                   <div>
-                    <span className="font-bold">{Number(formatEther(amount)).toLocaleString()} CLAWD</span>
+                    <span className="font-bold">{formatClawd(amount)} CLAWD</span>
                     {clawdUsdPrice && amount > 0n && (
                       <span className="text-xs text-base-content/50 ml-1">
                         ($
