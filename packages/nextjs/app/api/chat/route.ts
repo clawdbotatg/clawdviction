@@ -10,9 +10,22 @@ const LARVA_SYSTEM_PROMPT = LARVA_BASE_PROMPT;
 
 const STAKING_CONTRACT = "0xFE69980a1203d664488A73aE806514d2a04C1F8a" as const;
 const UNISWAP_POOL = "0xCD55381a53da35Ab1D7Bc5e3fE5F76cac976FAc3" as const;
+const CLAWD_TOKEN = "0x9f86dB9fc6f7c9408e8Fda3Ff8ce4e78ac7a6b07" as const;
+const DEAD_ADDRESS = "0x000000000000000000000000000000000000dEaD" as const;
+const TOTAL_SUPPLY = 100_000_000_000; // 100B
 
 const STAKING_ABI = [
   { name: "totalSupplyStaked", type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+] as const;
+
+const ERC20_ABI = [
+  {
+    name: "balanceOf",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ type: "uint256" }],
+  },
 ] as const;
 
 const POOL_ABI = [
@@ -134,6 +147,23 @@ async function executeToolCall(name: string, input: Record<string, unknown>): Pr
         results.total_staked_clawd = await getTotalStaked();
       } catch (e) {
         results.total_staked_clawd = `error: ${e instanceof Error ? e.message : String(e)}`;
+      }
+      // Burned supply — balance of 0xdead address
+      try {
+        const client = getBaseClient();
+        const burned = await client.readContract({
+          address: CLAWD_TOKEN,
+          abi: ERC20_ABI,
+          functionName: "balanceOf",
+          args: [DEAD_ADDRESS],
+        });
+        const burnedFormatted = parseFloat(formatUnits(burned, 18));
+        results.burned_clawd = burnedFormatted;
+        results.total_supply = TOTAL_SUPPLY;
+        results.circulating_supply = TOTAL_SUPPLY - burnedFormatted;
+        results.pct_burned = ((burnedFormatted / TOTAL_SUPPLY) * 100).toFixed(2) + "%";
+      } catch (e) {
+        results.burned_clawd = `error: ${e instanceof Error ? e.message : String(e)}`;
       }
       return JSON.stringify(results);
     }
