@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
-import { useAuth } from "~~/hooks/useAuth";
 
 const ADMIN_WALLET = "0x11ce532845ce0eacda41f72fdc1c88c335981442";
 
@@ -21,7 +20,6 @@ interface Proposal {
 
 const GovPage: NextPage = () => {
   const { address } = useAccount();
-  const { isAuthenticated } = useAuth(address);
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -42,7 +40,7 @@ const GovPage: NextPage = () => {
       <div className="w-full max-w-3xl">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold">🦞 Governance</h1>
-          {isAdmin && isAuthenticated && (
+          {isAdmin && (
             <Link href="/gov/create" className="btn btn-primary btn-sm">
               + Create Proposal
             </Link>
@@ -76,7 +74,7 @@ const GovPage: NextPage = () => {
                       </p>
                     </div>
                     <Link href={`/gov/${p.id}`} className="btn btn-ghost btn-sm">
-                      {isAuthenticated ? "View →" : "Details →"}
+                      View →
                     </Link>
                   </div>
                 </div>
