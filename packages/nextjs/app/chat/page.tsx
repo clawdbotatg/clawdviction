@@ -10,6 +10,7 @@ import { useAuth } from "~~/hooks/useAuth";
 import { authFetch } from "~~/lib/authFetch";
 
 const CLAWDVICTION_THRESHOLD = 300_000n;
+const CHAT_COST = 50_000n; // CV cost per message — matches backend deduction
 
 interface Message {
   role: "user" | "assistant";
@@ -119,7 +120,11 @@ const ChatPage: NextPage = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const hasEnoughClawdviction = clawdviction !== null && BigInt(clawdviction) >= CLAWDVICTION_THRESHOLD;
+  const cvBig = clawdviction !== null ? BigInt(clawdviction) : null;
+  const hasEnoughClawdviction = cvBig !== null && cvBig >= CLAWDVICTION_THRESHOLD;
+  // Once onboarded, always show chat — CV only gates the individual send
+  const showChat = hasEnoughClawdviction || onboardComplete === true;
+  const hasEnoughToSend = cvBig !== null && cvBig >= CHAT_COST;
 
   const launchLarva = async () => {
     if (!address) return;
@@ -244,8 +249,8 @@ const ChatPage: NextPage = () => {
     );
   }
 
-  // Not enough clawdviction
-  if (!hasEnoughClawdviction) {
+  // Not enough clawdviction (only blocks users who haven't onboarded yet)
+  if (!showChat) {
     const progress = Math.min(100, (Number(clawdviction ?? "0") / Number(CLAWDVICTION_THRESHOLD)) * 100);
     return (
       <div className="flex items-center flex-col flex-grow pt-20 px-5">
@@ -351,25 +356,39 @@ const ChatPage: NextPage = () => {
         </div>
 
         <div className="border-t border-base-300 px-4 pt-3 pb-4">
-          <div className="flex gap-2 items-end">
-            <textarea
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  sendMessage();
-                }
-              }}
-              placeholder="Talk to your larva... (Shift+Enter for new line)"
-              rows={1}
-              className="textarea textarea-bordered flex-1 resize-none"
-              style={{ minHeight: "2.75rem", maxHeight: "10rem", overflowY: "auto" }}
-            />
-            <button onClick={sendMessage} disabled={loading || !input.trim()} className="btn btn-primary">
-              Send
-            </button>
-          </div>
+          {!hasEnoughToSend ? (
+            <div className="text-center py-3">
+              <p className="text-base-content/70 font-medium mb-1">🦀 Your larva is resting...</p>
+              <p className="text-sm text-base-content/50">
+                Each message costs <span className="font-semibold">50K CV</span>. Your balance is regenerating — stake
+                more $CLAWD to speed it up.
+              </p>
+              <Link href="/stake" className="btn btn-sm btn-outline mt-3">
+                Stake More 🦞
+              </Link>
+            </div>
+          ) : (
+            <div className="flex gap-2 items-end">
+              <textarea
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                  }
+                }}
+                placeholder="Talk to your larva... (Shift+Enter for new line)"
+                rows={1}
+                className="textarea textarea-bordered flex-1 resize-none"
+                style={{ minHeight: "2.75rem", maxHeight: "10rem", overflowY: "auto" }}
+              />
+              <button onClick={sendMessage} disabled={loading || !input.trim()} className="btn btn-primary">
+                Send
+              </button>
+            </div>
+          )}
+          {hasEnoughToSend && <p className="text-xs text-base-content/30 text-right mt-1">50K CV per message</p>}
         </div>
       </div>
     </div>
