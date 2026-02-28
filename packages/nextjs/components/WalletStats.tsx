@@ -80,9 +80,9 @@ export const WalletStats = ({ address }: { address: Address }) => {
   return (
     <div className="absolute top-full right-0 mt-1 z-50">
       <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-base-300/90 shadow-lg text-xs whitespace-nowrap backdrop-blur-sm">
-        <span>🦞 {cvFormatted} CV</span>
+        <span>🦀 {cvFormatted} CV</span>
         <span className="opacity-40">|</span>
-        <span>🦀 {clawdFormatted} $CLAWD</span>
+        <span>🦞 {clawdFormatted} $CLAWD</span>
       </div>
     </div>
   );
