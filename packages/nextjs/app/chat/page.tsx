@@ -9,7 +9,7 @@ import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useAuth } from "~~/hooks/useAuth";
 import { authFetch } from "~~/lib/authFetch";
 
-const CLAWDVICTION_THRESHOLD = 1_000_000n * 10n ** 18n;
+const CLAWDVICTION_THRESHOLD = 1_000_000n;
 
 interface Message {
   role: "user" | "assistant";
