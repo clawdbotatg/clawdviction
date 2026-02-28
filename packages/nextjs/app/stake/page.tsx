@@ -304,7 +304,7 @@ const StakePage: NextPage = () => {
       </div>
 
       {/* Larva CTA — unlocks at 1M clawdviction */}
-      {clawdvictionScore !== null && BigInt(clawdvictionScore) >= 300_000n && (
+      {clawdvictionScore !== null && BigInt(clawdvictionScore) >= 800n && (
         <div className="w-full max-w-lg my-4">
           <Link href="/chat" className="btn btn-primary btn-lg w-full shadow-xl">
             🦞 Train Your Larva
