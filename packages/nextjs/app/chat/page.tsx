@@ -356,6 +356,19 @@ const ChatPage: NextPage = () => {
         </div>
 
         <div className="border-t border-base-300 px-4 pt-3 pb-4">
+          {clawdviction !== null && (
+            <div className="flex justify-end mb-2">
+              <span className="text-xs text-base-content/40 tabular-nums">
+                🦀{" "}
+                {(() => {
+                  const n = Number(clawdviction);
+                  if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M CV";
+                  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K CV";
+                  return n.toFixed(0) + " CV";
+                })()}
+              </span>
+            </div>
+          )}
           {!hasEnoughToSend ? (
             <div className="text-center py-3">
               <p className="text-base-content/70 font-medium mb-1">🦀 Your larva is resting...</p>
