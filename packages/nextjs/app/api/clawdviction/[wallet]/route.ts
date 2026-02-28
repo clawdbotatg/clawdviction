@@ -63,12 +63,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         const accrualRate = BigInt(row.accrual_rate);
         const lastAccruedAt = new Date(row.last_accrued_at);
         const elapsed = nowUnix - BigInt(Math.floor(lastAccruedAt.getTime() / 1000));
-        const pending = accrualRate * (elapsed > 0n ? elapsed : 0n);
+        const pending = (accrualRate * (elapsed > 0n ? elapsed : 0n)) / DIVISOR;
         const totalCv = balance + pending;
+
+        // Return per-second rate as float for frontend optimistic counter
+        const accrualRateFloat = Number(accrualRate) / Number(DIVISOR);
 
         return NextResponse.json({
           clawdviction: totalCv.toString(),
-          accrualRate: accrualRate.toString(),
+          accrualRate: accrualRateFloat,
           lastAccruedAt: lastAccruedAt.toISOString(),
           balance: balance.toString(),
           totalEarned: row.total_earned.toString(),
@@ -135,7 +138,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       try {
         await sql`
           INSERT INTO clawdviction_balances (wallet, balance, last_accrued_at, accrual_rate, total_earned, total_spent)
-          VALUES (${walletLower}, ${totalCv.toString()}::numeric, ${now.toISOString()}, ${(currentTotalStaked / DIVISOR).toString()}::numeric, ${totalCv.toString()}::numeric, 0)
+          VALUES (${walletLower}, ${totalCv.toString()}::numeric, ${now.toISOString()}, ${currentTotalStaked.toString()}::numeric, ${totalCv.toString()}::numeric, 0)
           ON CONFLICT (wallet) DO NOTHING`;
       } catch (e) {
         console.error("Error seeding DB:", e);
@@ -144,7 +147,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     return NextResponse.json({
       clawdviction: totalCv.toString(),
-      accrualRate: (currentTotalStaked / DIVISOR).toString(),
+      accrualRate: Number(currentTotalStaked) / Number(DIVISOR),
       lastAccruedAt: now.toISOString(),
       balance: totalCv.toString(),
       totalEarned: totalCv.toString(),

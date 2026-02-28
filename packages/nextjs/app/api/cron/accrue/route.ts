@@ -117,7 +117,7 @@ export async function GET(request: NextRequest) {
           // Materialize pending accrual
           const lastAccrued = BigInt(Math.floor(new Date(existing.last_accrued_at).getTime() / 1000));
           const elapsed = nowUnix - lastAccrued;
-          const pending = BigInt(existing.accrual_rate) * (elapsed > 0n ? elapsed : 0n);
+          const pending = (BigInt(existing.accrual_rate) * (elapsed > 0n ? elapsed : 0n)) / DIVISOR;
           const newBalance = BigInt(existing.balance) + pending;
           const newTotalEarned = BigInt(existing.total_earned) + pending;
 
@@ -125,14 +125,14 @@ export async function GET(request: NextRequest) {
             UPDATE clawdviction_balances SET
               balance = ${newBalance.toString()}::numeric,
               last_accrued_at = ${now.toISOString()},
-              accrual_rate = ${(currentTotalStaked / DIVISOR).toString()}::numeric,
+              accrual_rate = ${currentTotalStaked.toString()}::numeric,
               total_earned = ${newTotalEarned.toString()}::numeric
             WHERE wallet = ${w}`;
         } else {
           // New wallet — seed with on-chain data
           await sql`
             INSERT INTO clawdviction_balances (wallet, balance, last_accrued_at, accrual_rate, total_earned, total_spent)
-            VALUES (${w}, ${totalEarnedFromChain.toString()}::numeric, ${now.toISOString()}, ${(currentTotalStaked / DIVISOR).toString()}::numeric, ${totalEarnedFromChain.toString()}::numeric, 0)`;
+            VALUES (${w}, ${totalEarnedFromChain.toString()}::numeric, ${now.toISOString()}, ${currentTotalStaked.toString()}::numeric, ${totalEarnedFromChain.toString()}::numeric, 0)`;
         }
 
         processed++;

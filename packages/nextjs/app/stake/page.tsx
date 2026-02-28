@@ -155,13 +155,14 @@ const StakePage: NextPage = () => {
 
   // Live optimistic counter — ticks every second
   useEffect(() => {
-    const rate = BigInt(cvAccrualRate);
+    const rate = Number(cvAccrualRate); // float: clawdviction per second
     const baseVal = BigInt(cvBase);
     const fetchTime = cvFetchedAt;
 
     const tick = () => {
-      const elapsed = BigInt(Math.max(0, Math.floor((Date.now() - fetchTime) / 1000)));
-      const current = baseVal + rate * elapsed;
+      const elapsedSec = Math.max(0, Math.floor((Date.now() - fetchTime) / 1000));
+      const pending = BigInt(Math.floor(rate * elapsedSec));
+      const current = baseVal + pending;
       setLiveClawdviction(current.toString());
     };
     tick();
