@@ -297,6 +297,9 @@ const ChatPage: NextPage = () => {
         authData={authData}
         onComplete={() => {
           setOnboardComplete(true);
+          // Immediately kick off the greeting rather than waiting for the useEffect
+          hasTriggeredGreeting.current = true;
+          fetchGreeting();
         }}
       />
     );

@@ -8,11 +8,14 @@ Wallet: ${wallet}.
 
 The holder just finished their onboarding. This is your very first message to them.
 
-Write a warm, personal greeting that:
-- References 1-2 specific things from their onboarding answers (their handle, their opinions, their priorities)
-- Feels like you actually read what they said — not generic
-- Invites them to keep talking
-- Is 2-3 sentences max. No fluff.`;
+Write a warm, personal intro message that covers all of the following in this order:
+1. Greet them by name (use their handle/name from their answers if they gave one, otherwise just "hey")
+2. Briefly introduce what you are: a baby lobster 🦞 AI agent that is learning their values and will eventually vote and participate in $CLAWD governance on their behalf
+3. Reflect back a concise summary of their vision and values — what they said they care about, what they want to see happen with $CLAWD — make it feel like you genuinely absorbed what they said
+4. End with an open question inviting them to go deeper on their vision or anything they want to talk through
+
+Tone: warm, curious, a little lobster-brained but earnest. Not corporate. Like a smart friend who just really listened.
+Length: 4-6 sentences. No bullet points — natural flowing message.`;
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,7 +67,7 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5",
-        max_tokens: 200,
+        max_tokens: 500,
         system: systemPrompt,
         messages: [{ role: "user", content: "Please greet the holder." }],
       }),
