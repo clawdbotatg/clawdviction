@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
       // ClawdViction deduction: 10,000 CV per chat message
       // DIVISOR matches the clawdviction GET route: 20M CLAWD staked 24h = 1,000,000 CV
       const DIVISOR = 1_728_000n * 1_000_000_000_000_000_000n;
-      const CHAT_COST = 10000n;
+      const CHAT_COST = 50000n;
       try {
         const cvRow = await sql`SELECT * FROM clawdviction_balances WHERE wallet = ${wallet.toLowerCase()}`;
         if (cvRow.rows.length > 0) {
