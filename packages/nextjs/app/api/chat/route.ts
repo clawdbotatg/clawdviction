@@ -350,7 +350,7 @@ export async function POST(request: NextRequest) {
         headers: apiHeaders,
         body: JSON.stringify({
           model: "claude-haiku-4-5",
-          max_tokens: round === 0 ? 600 : 800,
+          max_tokens: round === 0 ? 200 : 400,
           system: systemPrompt,
           messages: currentMessages,
           tools: ANTHROPIC_TOOLS,
