@@ -310,21 +310,12 @@ const ChatPage: NextPage = () => {
     );
   }
 
-  // Chat
+  // Chat — full-height, messages scroll freely behind sticky navbar
   return (
-    <div className="flex flex-col flex-grow pt-6 px-5 max-w-5xl mx-auto w-full">
-      <div
-        className="bg-base-100/70 backdrop-blur-sm rounded-2xl flex flex-col overflow-hidden"
-        style={{ minHeight: "70vh" }}
-      >
-        <div className="px-4 pt-4 pb-2 border-b border-base-300">
-          <span className="text-sm text-base-content/60">
-            🦀 Your larva is alive — teach it your values, and it will vote on your behalf and participate in private
-            holder discussions.
-          </span>
-        </div>
-
-        <div className="flex-1 overflow-y-auto space-y-3 p-4 min-h-0">
+    <div className="flex flex-col flex-1 overflow-hidden w-full">
+      {/* Scrollable message history — fills all available space */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-3xl mx-auto px-4 pt-4 pb-2 space-y-3">
           {messages.length === 0 && !loading && (
             <div className="text-center text-base-content/40 mt-20">
               <div className="text-4xl mb-3">🦞</div>
@@ -354,8 +345,11 @@ const ChatPage: NextPage = () => {
           )}
           <div ref={messagesEndRef} />
         </div>
+      </div>
 
-        <div className="border-t border-base-300 px-4 pt-3 pb-4">
+      {/* Input bar — always anchored to bottom */}
+      <div className="border-t border-base-300 bg-base-100/90 backdrop-blur-sm px-4 pt-3 pb-4">
+        <div className="max-w-3xl mx-auto">
           {clawdviction !== null && (
             <div className="flex justify-end mb-2">
               <span className="text-xs text-base-content/40 tabular-nums">
@@ -392,7 +386,7 @@ const ChatPage: NextPage = () => {
                     sendMessage();
                   }
                 }}
-                placeholder="Talk to your larva... (Shift+Enter for new line)"
+                placeholder="Talk to your larva..."
                 rows={1}
                 className="textarea textarea-bordered flex-1 resize-none"
                 style={{ minHeight: "2.75rem", maxHeight: "10rem", overflowY: "auto" }}
