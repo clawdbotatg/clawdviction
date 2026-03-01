@@ -310,9 +310,9 @@ const ChatPage: NextPage = () => {
     );
   }
 
-  // Chat — full-height, messages scroll freely behind sticky navbar
+  // Chat — fixed to viewport, header visible, input visible, messages scroll in between
   return (
-    <div className="flex flex-col flex-1 overflow-hidden w-full">
+    <div className="fixed inset-x-0 bottom-0 flex flex-col" style={{ top: "4rem" }}>
       {/* Scrollable message history — fills all available space */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto px-4 pt-4 pb-2 space-y-3">
