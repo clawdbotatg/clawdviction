@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initDb, sql } from "~~/lib/db";
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const secret = process.env.CRON_SECRET;
     const authHeader = request.headers.get("authorization");
@@ -9,7 +9,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const id = parseInt(params.id);
+    const { id: idStr } = await params;
+    const id = parseInt(idStr);
     if (isNaN(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
     const { wallet, response, reasoning } = await request.json();

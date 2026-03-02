@@ -4,10 +4,11 @@ import { verifyAuth } from "~~/lib/verifyAuth";
 
 const ADMIN_WALLET = "0x11ce532845ce0eacda41f72fdc1c88c335981442";
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initDb();
-    const id = parseInt(params.id);
+    const { id: idStr } = await params;
+    const id = parseInt(idStr);
     if (isNaN(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
     const proposalResult = await sql`SELECT * FROM governance_proposals WHERE id = ${id}`;
