@@ -3,7 +3,7 @@ import { createPublicClient, http, parseAbiItem } from "viem";
 import { base } from "viem/chains";
 import { initDb, isDbAvailable, sql } from "~~/lib/db";
 
-const STAKING_ADDRESS = "0xFE69980a1203d664488A73aE806514d2a04C1F8a" as const;
+const STAKING_ADDRESS = "0xC9E377FB98a1aA6Ecf4B553cE1b57940121213bf" as const;
 
 const StakedEvent = parseAbiItem(
   "event Staked(address indexed user, uint256 amount, uint256 stakeIndex, uint256 stakedAt)",
