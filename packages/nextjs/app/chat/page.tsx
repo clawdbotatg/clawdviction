@@ -9,7 +9,7 @@ import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useAuth } from "~~/hooks/useAuth";
 import { authFetch } from "~~/lib/authFetch";
 
-const CLAWDVICTION_THRESHOLD = 800n; // Must have this much CV to send a message (backend deducts 10K after)
+const CLAWDVICTION_THRESHOLD = 1_000_000n; // Must have this much CV to send a message (backend deducts 50K after)
 
 interface Message {
   role: "user" | "assistant";
@@ -258,7 +258,7 @@ const ChatPage: NextPage = () => {
         <div className="bg-base-100/60 backdrop-blur-sm rounded-xl px-6 py-4 mb-6 text-center max-w-md">
           <h2 className="text-2xl font-bold mb-2">Earn More ClawdViction</h2>
           <p className="text-base-content/60">
-            You need 800 clawdviction to unlock your personal larva. Stake $CLAWD and let it grow over time.
+            You need 1,000,000 clawdviction to unlock your personal larva. Stake $CLAWD and let it grow over time.
           </p>
         </div>
         <div className="w-full max-w-md mb-4">
@@ -367,7 +367,7 @@ const ChatPage: NextPage = () => {
             <div className="text-center py-3">
               <p className="text-base-content/70 font-medium mb-1">🦀 Your larva is resting...</p>
               <p className="text-sm text-base-content/50">
-                You need <span className="font-semibold">800 CV</span> to send a message. Each chat costs{" "}
+                You need <span className="font-semibold">1M CV</span> to send a message. Each chat costs{" "}
                 <span className="font-semibold">10K CV</span> — your balance is regenerating. Stake more $CLAWD to speed
                 it up.
               </p>
@@ -397,7 +397,7 @@ const ChatPage: NextPage = () => {
             </div>
           )}
           {hasEnoughToSend && (
-            <p className="text-xs text-base-content/30 text-right mt-1">costs 10K CV · need 800 to send again</p>
+            <p className="text-xs text-base-content/30 text-right mt-1">costs 50K CV · need 1M to send again</p>
           )}
         </div>
       </div>

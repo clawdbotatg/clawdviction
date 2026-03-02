@@ -314,7 +314,7 @@ export async function POST(request: NextRequest) {
     // Gate: check CV balance BEFORE calling Haiku — don't burn an API call if they can't afford it
     if (dbOk) {
       const DIVISOR_PRE = 1_728_000n * 1_000_000_000_000_000_000n;
-      const SEND_THRESHOLD_PRE = 800n;
+      const SEND_THRESHOLD_PRE = 1_000_000n;
       try {
         const cvPre =
           await sql`SELECT balance, accrual_rate, last_accrued_at FROM clawdviction_balances WHERE wallet = ${wallet.toLowerCase()}`;
@@ -325,7 +325,7 @@ export async function POST(request: NextRequest) {
           const materialized =
             BigInt(r.balance) + (BigInt(r.accrual_rate) * (elapsed > 0n ? elapsed : 0n)) / DIVISOR_PRE;
           if (materialized < SEND_THRESHOLD_PRE) {
-            return NextResponse.json({ error: "Insufficient CV — need 800 to chat" }, { status: 402 });
+            return NextResponse.json({ error: "Insufficient CV — need 1M to chat" }, { status: 402 });
           }
         }
       } catch (e) {
@@ -389,9 +389,9 @@ export async function POST(request: NextRequest) {
         INSERT INTO chat_messages (wallet, role, content) VALUES (${wallet}, 'assistant', ${assistantMessage})`;
 
       // ClawdViction gate + deduction
-      // Must have >= 800 CV to send; deducts 10K after a successful message
+      // Must have >= 1M CV to send; deducts 50K after a successful message
       const DIVISOR = 1_728_000n * 1_000_000_000_000_000_000n;
-      const CHAT_COST = 10_000n;
+      const CHAT_COST = 50_000n;
       try {
         const cvRow = await sql`SELECT * FROM clawdviction_balances WHERE wallet = ${wallet.toLowerCase()}`;
         if (cvRow.rows.length > 0) {
