@@ -389,9 +389,9 @@ export async function POST(request: NextRequest) {
         INSERT INTO chat_messages (wallet, role, content) VALUES (${wallet}, 'assistant', ${assistantMessage})`;
 
       // ClawdViction gate + deduction
-      // Must have >= 1M CV to send; deducts 50K after a successful message
+      // Must have >= 1M CV to send; deducts 10K after a successful message
       const DIVISOR = 1_728_000n * 1_000_000_000_000_000_000n;
-      const CHAT_COST = 50_000n;
+      const CHAT_COST = 10_000n;
       try {
         const cvRow = await sql`SELECT * FROM clawdviction_balances WHERE wallet = ${wallet.toLowerCase()}`;
         if (cvRow.rows.length > 0) {

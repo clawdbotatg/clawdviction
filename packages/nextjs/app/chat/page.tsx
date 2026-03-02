@@ -397,7 +397,7 @@ const ChatPage: NextPage = () => {
             </div>
           )}
           {hasEnoughToSend && (
-            <p className="text-xs text-base-content/30 text-right mt-1">costs 50K CV · need 1M to send again</p>
+            <p className="text-xs text-base-content/30 text-right mt-1">costs 10K CV · need 1M to send again</p>
           )}
         </div>
       </div>
