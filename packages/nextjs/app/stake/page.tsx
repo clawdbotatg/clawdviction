@@ -176,8 +176,15 @@ const StakePage: NextPage = () => {
   const isLocalNetwork = targetNetwork.id === 31337;
   const needsApproval = parsedAmount > 0n && ((allowance as bigint) ?? 0n) < parsedAmount;
 
-  const formatClawdviction = (score: string) => {
+  const formatClawdviction = (score: string, live = false) => {
     const n = Number(score);
+    // Live counter: show enough digits that ticking is visible
+    if (live) {
+      if (n >= 10_000_000) return `${(n / 1_000_000).toFixed(3)}M`;
+      if (n >= 1_000) return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+      return n.toFixed(0);
+    }
+    // Static display
     if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
     if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
     if (n >= 1) return n.toFixed(2);
@@ -278,7 +285,7 @@ const StakePage: NextPage = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid md:grid-cols-3 gap-4 w-full max-w-3xl mb-8">
+      <div className="grid md:grid-cols-3 gap-4 w-full max-w-4xl mb-8">
         <div className="stat bg-base-200 rounded-xl shadow">
           <div className="stat-title">Your Staked</div>
           <div className="stat-value text-error text-2xl">{totalStaked ? formatClawd(totalStaked) : "0"} CLAWD</div>
@@ -293,8 +300,8 @@ const StakePage: NextPage = () => {
         </div>
         <div className="stat bg-base-200 rounded-xl shadow">
           <div className="stat-title">Your ClawdViction</div>
-          <div className="stat-value text-error text-2xl">
-            {formatClawdviction(liveClawdviction ?? clawdvictionScore ?? "0")} 🦀
+          <div className="stat-value text-error text-2xl tabular-nums">
+            {formatClawdviction(liveClawdviction ?? clawdvictionScore ?? "0", true)} 🦀
           </div>
         </div>
         <div className="stat bg-base-200 rounded-xl shadow">
