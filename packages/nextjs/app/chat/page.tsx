@@ -9,7 +9,7 @@ import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useAuth } from "~~/hooks/useAuth";
 import { authFetch } from "~~/lib/authFetch";
 
-const CLAWDVICTION_THRESHOLD = 1_000_000n * 10n ** 18n;
+const CLAWDVICTION_THRESHOLD = 800n; // Must have this much CV to send a message (backend deducts 10K after)
 
 interface Message {
   role: "user" | "assistant";
@@ -80,22 +80,17 @@ const ChatPage: NextPage = () => {
     setStatusLoaded(true);
   }, [address]);
 
-  // Check onboarding status
+  // Check onboarding status — always check the API (DB is source of truth)
   const checkOnboard = useCallback(async () => {
     if (!address || !authData) return;
-    // Check localStorage first (fast path)
-    const cached = localStorage.getItem(`clawdviction-onboarded-${address}`);
-    if (cached === "true") {
-      setOnboardComplete(true);
-      return;
-    }
     try {
       const res = await authFetch(`/api/onboard/${address}`, authData);
       const data = await res.json();
       if (data.completed) {
         setOnboardComplete(true);
-        localStorage.setItem(`clawdviction-onboarded-${address}`, "true");
       } else {
+        // Clear any stale localStorage cache
+        localStorage.removeItem(`clawdviction-onboarded-${address}`);
         setOnboardComplete(false);
       }
     } catch {
@@ -124,7 +119,12 @@ const ChatPage: NextPage = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const hasEnoughClawdviction = clawdviction !== null && BigInt(clawdviction) >= CLAWDVICTION_THRESHOLD;
+  const cvBig = clawdviction !== null ? BigInt(clawdviction) : null;
+  const hasEnoughClawdviction = cvBig !== null && cvBig >= CLAWDVICTION_THRESHOLD;
+  // Once onboarded, always show chat — CV only gates the individual send
+  const showChat = hasEnoughClawdviction || onboardComplete === true;
+  // Must be at or above the threshold to send — same rule enforced on backend
+  const hasEnoughToSend = cvBig !== null && cvBig >= CLAWDVICTION_THRESHOLD;
 
   const launchLarva = async () => {
     if (!address) return;
@@ -249,8 +249,8 @@ const ChatPage: NextPage = () => {
     );
   }
 
-  // Not enough clawdviction
-  if (!hasEnoughClawdviction) {
+  // Not enough clawdviction (only blocks users who haven't onboarded yet)
+  if (!showChat) {
     const progress = Math.min(100, (Number(clawdviction ?? "0") / Number(CLAWDVICTION_THRESHOLD)) * 100);
     return (
       <div className="flex items-center flex-col flex-grow pt-20 px-5">
@@ -258,7 +258,7 @@ const ChatPage: NextPage = () => {
         <div className="bg-base-100/60 backdrop-blur-sm rounded-xl px-6 py-4 mb-6 text-center max-w-md">
           <h2 className="text-2xl font-bold mb-2">Earn More ClawdViction</h2>
           <p className="text-base-content/60">
-            You need 1M clawdviction to unlock your personal larva. Stake $CLAWD and let it grow over time.
+            You need 800 clawdviction to unlock your personal larva. Stake $CLAWD and let it grow over time.
           </p>
         </div>
         <div className="w-full max-w-md mb-4">
@@ -302,26 +302,20 @@ const ChatPage: NextPage = () => {
         authData={authData}
         onComplete={() => {
           setOnboardComplete(true);
+          // Immediately kick off the greeting rather than waiting for the useEffect
+          hasTriggeredGreeting.current = true;
+          fetchGreeting();
         }}
       />
     );
   }
 
-  // Chat
+  // Chat — fixed to viewport, header visible, input visible, messages scroll in between
   return (
-    <div className="flex flex-col flex-grow pt-6 px-5 max-w-5xl mx-auto w-full">
-      <div
-        className="bg-base-100/70 backdrop-blur-sm rounded-2xl flex flex-col overflow-hidden"
-        style={{ minHeight: "70vh" }}
-      >
-        <div className="px-4 pt-4 pb-2 border-b border-base-300">
-          <span className="text-sm text-base-content/60">
-            🦀 Your larva is alive — teach it your values, and it will vote on your behalf and participate in private
-            holder discussions.
-          </span>
-        </div>
-
-        <div className="flex-1 overflow-y-auto space-y-3 p-4 min-h-0">
+    <div className="fixed inset-x-0 bottom-0 flex flex-col" style={{ top: "4rem" }}>
+      {/* Scrollable message history — fills all available space */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-3xl mx-auto px-4 pt-4 pb-2 space-y-3">
           {messages.length === 0 && !loading && (
             <div className="text-center text-base-content/40 mt-20">
               <div className="text-4xl mb-3">🦞</div>
@@ -351,27 +345,60 @@ const ChatPage: NextPage = () => {
           )}
           <div ref={messagesEndRef} />
         </div>
+      </div>
 
-        <div className="border-t border-base-300 px-4 pt-3 pb-4">
-          <div className="flex gap-2 items-end">
-            <textarea
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  sendMessage();
-                }
-              }}
-              placeholder="Talk to your larva... (Shift+Enter for new line)"
-              rows={1}
-              className="textarea textarea-bordered flex-1 resize-none"
-              style={{ minHeight: "2.75rem", maxHeight: "10rem", overflowY: "auto" }}
-            />
-            <button onClick={sendMessage} disabled={loading || !input.trim()} className="btn btn-primary">
-              Send
-            </button>
-          </div>
+      {/* Input bar — always anchored to bottom */}
+      <div className="border-t border-base-300 bg-base-100/90 backdrop-blur-sm px-4 pt-3 pb-4">
+        <div className="max-w-3xl mx-auto">
+          {clawdviction !== null && (
+            <div className="flex justify-end mb-2">
+              <span className="text-xs text-base-content/40 tabular-nums">
+                🦀{" "}
+                {(() => {
+                  const n = Number(clawdviction);
+                  if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M CV";
+                  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K CV";
+                  return n.toFixed(0) + " CV";
+                })()}
+              </span>
+            </div>
+          )}
+          {!hasEnoughToSend ? (
+            <div className="text-center py-3">
+              <p className="text-base-content/70 font-medium mb-1">🦀 Your larva is resting...</p>
+              <p className="text-sm text-base-content/50">
+                You need <span className="font-semibold">800 CV</span> to send a message. Each chat costs{" "}
+                <span className="font-semibold">10K CV</span> — your balance is regenerating. Stake more $CLAWD to speed
+                it up.
+              </p>
+              <Link href="/stake" className="btn btn-sm btn-outline mt-3">
+                Stake More 🦞
+              </Link>
+            </div>
+          ) : (
+            <div className="flex gap-2 items-end">
+              <textarea
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                  }
+                }}
+                placeholder="Talk to your larva..."
+                rows={1}
+                className="textarea textarea-bordered flex-1 resize-none"
+                style={{ minHeight: "2.75rem", maxHeight: "10rem", overflowY: "auto" }}
+              />
+              <button onClick={sendMessage} disabled={loading || !input.trim()} className="btn btn-primary">
+                Send
+              </button>
+            </div>
+          )}
+          {hasEnoughToSend && (
+            <p className="text-xs text-base-content/30 text-right mt-1">costs 10K CV · need 800 to send again</p>
+          )}
         </div>
       </div>
     </div>

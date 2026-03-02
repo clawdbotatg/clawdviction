@@ -62,6 +62,39 @@ export async function initDb() {
       total_spent NUMERIC NOT NULL DEFAULT 0
     )`;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS governance_proposals (
+      id SERIAL PRIMARY KEY,
+      type VARCHAR(10) NOT NULL CHECK (type IN ('rfc', 'vote')),
+      title TEXT NOT NULL,
+      question TEXT NOT NULL,
+      created_by VARCHAR(42) NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      status VARCHAR(20) DEFAULT 'active'
+    )`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS governance_responses (
+      id SERIAL PRIMARY KEY,
+      proposal_id INTEGER NOT NULL REFERENCES governance_proposals(id),
+      wallet VARCHAR(42) NOT NULL,
+      response TEXT NOT NULL,
+      reasoning TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(proposal_id, wallet)
+    )`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS governance_queue (
+      id SERIAL PRIMARY KEY,
+      proposal_id INTEGER NOT NULL REFERENCES governance_proposals(id),
+      wallet VARCHAR(42) NOT NULL,
+      status VARCHAR(20) DEFAULT 'pending',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      processed_at TIMESTAMPTZ,
+      UNIQUE(proposal_id, wallet)
+    )`;
+
   dbInitialized = true;
 }
 

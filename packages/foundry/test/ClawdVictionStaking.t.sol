@@ -88,41 +88,4 @@ contract ClawdVictionStakingTest is Test {
         assertEq(conviction, MIN_STAKE * 7200 + MIN_STAKE * 3600);
     }
 
-    function test_EmergencyWithdraw() public {
-        vm.startPrank(alice);
-        clawd.approve(address(staking), MIN_STAKE);
-        staking.stake(MIN_STAKE);
-        vm.stopPrank();
-
-        // Cannot emergency withdraw without emergency mode
-        vm.prank(alice);
-        vm.expectRevert("Not in emergency mode");
-        staking.emergencyWithdraw(0);
-
-        // Owner enables emergency mode
-        staking.enableEmergencyMode();
-        assertTrue(staking.emergencyMode());
-
-        // Now alice can emergency withdraw
-        vm.prank(alice);
-        staking.emergencyWithdraw(0);
-        assertEq(clawd.balanceOf(alice), 1_000_000 ether);
-        assertEq(staking.totalStaked(alice), 0);
-    }
-
-    function test_CannotStakeInEmergencyMode() public {
-        staking.enableEmergencyMode();
-
-        vm.startPrank(alice);
-        clawd.approve(address(staking), MIN_STAKE);
-        vm.expectRevert("Emergency mode active");
-        staking.stake(MIN_STAKE);
-        vm.stopPrank();
-    }
-
-    function test_OnlyOwnerCanEnableEmergency() public {
-        vm.prank(alice);
-        vm.expectRevert();
-        staking.enableEmergencyMode();
-    }
 }

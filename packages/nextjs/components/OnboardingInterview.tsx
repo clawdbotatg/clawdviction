@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AuthData } from "~~/hooks/useAuth";
 import { authFetch } from "~~/lib/authFetch";
 import { MAX_LENGTH_MAIN, MAX_LENGTH_NOTES, QUESTIONS } from "~~/lib/questions";
@@ -70,8 +70,17 @@ export const OnboardingInterview = ({ address, authData, onComplete }: Onboardin
     } catch {}
   }, [step, answers, checklistState, scaleValues, address]);
 
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   const currentQ = QUESTIONS[step];
   const progress = (step / QUESTIONS.length) * 100;
+
+  // Auto-focus the textarea whenever the step changes (if the question has a text input)
+  useEffect(() => {
+    if (currentQ.type === "textarea") {
+      setTimeout(() => textareaRef.current?.focus(), 50);
+    }
+  }, [step, currentQ.type]);
 
   const setAnswer = (val: string) => {
     if (currentQ.type === "scale") {
@@ -91,13 +100,25 @@ export const OnboardingInterview = ({ address, authData, onComplete }: Onboardin
     });
   };
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
     if (step < QUESTIONS.length - 1) setStep((s: number) => s + 1);
-  };
+  }, [step]);
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     if (step > 0) setStep((s: number) => s - 1);
-  };
+  }, [step]);
+
+  // Arrow key navigation — skip when focus is inside a text input
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "TEXTAREA" || tag === "INPUT") return;
+      if (e.key === "ArrowRight") handleNext();
+      if (e.key === "ArrowLeft") handleBack();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handleNext, handleBack]);
 
   const handleSubmit = async () => {
     setSubmitting(true);
@@ -156,6 +177,7 @@ export const OnboardingInterview = ({ address, authData, onComplete }: Onboardin
           {currentQ.type === "textarea" && (
             <div>
               <textarea
+                ref={textareaRef}
                 className="textarea textarea-bordered rounded-none [border-radius:0] w-full h-36 text-base"
                 placeholder={currentQ.placeholder}
                 maxLength={currentQ.maxLength ?? MAX_LENGTH_MAIN}

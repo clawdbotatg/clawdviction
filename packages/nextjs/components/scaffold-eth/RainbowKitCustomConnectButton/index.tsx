@@ -8,6 +8,7 @@ import { WrongNetworkDropdown } from "./WrongNetworkDropdown";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { Balance } from "@scaffold-ui/components";
 import { Address } from "viem";
+import { WalletStats } from "~~/components/WalletStats";
 import { useNetworkColor } from "~~/hooks/scaffold-eth";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
 import { getBlockExplorerAddressLink } from "~~/utils/scaffold-eth";
@@ -43,29 +44,32 @@ export const RainbowKitCustomConnectButton = () => {
               }
 
               return (
-                <>
-                  <div className="flex flex-col items-center mr-2">
-                    <Balance
+                <div className="relative">
+                  <div className="flex items-center">
+                    <div className="flex flex-col items-center mr-2">
+                      <Balance
+                        address={account.address as Address}
+                        style={{
+                          minHeight: "0",
+                          height: "auto",
+                          fontSize: "0.8em",
+                        }}
+                      />
+                      <span className="text-xs" style={{ color: networkColor }}>
+                        {chain.name}
+                      </span>
+                    </div>
+                    <AddressInfoDropdown
                       address={account.address as Address}
-                      style={{
-                        minHeight: "0",
-                        height: "auto",
-                        fontSize: "0.8em",
-                      }}
+                      displayName={account.displayName}
+                      ensAvatar={account.ensAvatar}
+                      blockExplorerAddressLink={blockExplorerAddressLink}
                     />
-                    <span className="text-xs" style={{ color: networkColor }}>
-                      {chain.name}
-                    </span>
+                    <AddressQRCodeModal address={account.address as Address} modalId="qrcode-modal" />
+                    <RevealBurnerPKModal />
                   </div>
-                  <AddressInfoDropdown
-                    address={account.address as Address}
-                    displayName={account.displayName}
-                    ensAvatar={account.ensAvatar}
-                    blockExplorerAddressLink={blockExplorerAddressLink}
-                  />
-                  <AddressQRCodeModal address={account.address as Address} modalId="qrcode-modal" />
-                  <RevealBurnerPKModal />
-                </>
+                  <WalletStats address={account.address as Address} />
+                </div>
               );
             })()}
           </>

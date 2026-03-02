@@ -1,18 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initDb, isDbAvailable, sql } from "~~/lib/db";
+import { LARVA_GREET_PROMPT } from "~~/lib/larvaContext";
 import { formatAnswersAsQA } from "~~/lib/questions";
 import { verifyAuth } from "~~/lib/verifyAuth";
 
-const GREET_SYSTEM = (wallet: string) => `You are a Larva — a personal AI governance agent for a $CLAWD token holder.
-Wallet: ${wallet}.
-
-The holder just finished their onboarding. This is your very first message to them.
-
-Write a warm, personal greeting that:
-- References 1-2 specific things from their onboarding answers (their handle, their opinions, their priorities)
-- Feels like you actually read what they said — not generic
-- Invites them to keep talking
-- Is 2-3 sentences max. No fluff.`;
+const GREET_SYSTEM = LARVA_GREET_PROMPT;
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,7 +56,7 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5",
-        max_tokens: 200,
+        max_tokens: 500,
         system: systemPrompt,
         messages: [{ role: "user", content: "Please greet the holder." }],
       }),

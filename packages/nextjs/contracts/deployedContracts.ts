@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   8453: {
     ClawdVictionStaking: {
-      address: "0xFE69980a1203d664488A73aE806514d2a04C1F8a",
+      address: "0xC9E377FB98a1aA6Ecf4B553cE1b57940121213bf",
       abi: [
         {
           type: "constructor",

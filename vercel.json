@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/accrue",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/gov/queue/process",
+      "schedule": "* * * * *"
+    }
+  ]
+}
