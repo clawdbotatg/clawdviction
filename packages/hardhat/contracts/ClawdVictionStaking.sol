@@ -3,12 +3,11 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 
 /// @title ClawdViction Staking
 /// @notice Stake $CLAWD tokens to earn clawdviction (amount × time).
 ///         Clawdviction determines governance weight for your AI larva.
-contract ClawdVictionStaking is Ownable {
+contract ClawdVictionStaking {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable clawdToken;
@@ -29,18 +28,14 @@ contract ClawdVictionStaking is Ownable {
     mapping(address => uint256) public clawdvictionAccrued;
     mapping(address => uint256) public weightedStakeSum;
 
-    bool public emergencyMode;
-
     event Staked(address indexed user, uint256 amount, uint256 stakeIndex);
     event Unstaked(address indexed user, uint256 amount, uint256 stakeIndex, uint256 clawdviction);
-    event EmergencyModeEnabled();
 
-    constructor(address _clawdToken) Ownable(msg.sender) {
+    constructor(address _clawdToken) {
         clawdToken = IERC20(_clawdToken);
     }
 
     function stake(uint256 amount) external {
-        require(!emergencyMode, "Emergency mode active");
         require(amount >= MIN_STAKE, "Below minimum stake");
         clawdToken.safeTransferFrom(msg.sender, address(this), amount);
         uint256 stakeIndex = stakes[msg.sender].length;
@@ -65,27 +60,6 @@ contract ClawdVictionStaking is Ownable {
         totalSupplyStaked -= amount;
         clawdToken.safeTransfer(msg.sender, amount);
         emit Unstaked(msg.sender, amount, stakeIndex, clawdviction);
-    }
-
-    /// @notice Emergency withdrawal — skips clawdviction accounting, just returns tokens
-    /// @dev Only available when owner enables emergency mode
-    function emergencyWithdraw(uint256 stakeIndex) external {
-        require(emergencyMode, "Not in emergency mode");
-        require(stakeIndex < stakes[msg.sender].length, "Invalid stake index");
-        Stake storage s = stakes[msg.sender][stakeIndex];
-        require(s.amount > 0, "Already unstaked");
-        uint256 amount = s.amount;
-        s.amount = 0;
-        totalStaked[msg.sender] -= amount;
-        totalSupplyStaked -= amount;
-        // Skip clawdviction accounting — just get tokens out
-        clawdToken.safeTransfer(msg.sender, amount);
-    }
-
-    /// @notice Owner can enable emergency mode (irreversible) if token transfer breaks
-    function enableEmergencyMode() external onlyOwner {
-        emergencyMode = true;
-        emit EmergencyModeEnabled();
     }
 
     function getStakeClawdviction(address user, uint256 stakeIndex) public view returns (uint256) {
