@@ -74,7 +74,7 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
           ← Back to Gov
         </Link>
 
-        <div className="card bg-base-200 shadow-md mb-6">
+        <div className="card rounded-none bg-base-200 shadow-md mb-6">
           <div className="card-body">
             <div className="flex items-center gap-2 mb-2">
               <span className={`badge ${proposal.type === "vote" ? "badge-error" : "badge-info"}`}>
@@ -93,7 +93,7 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
 
         {/* Admin view: vote tallies + full responses */}
         {isAdmin && isAuthenticated && tallies && totalVotes > 0 && (
-          <div className="card bg-base-200 shadow-md mb-6">
+          <div className="card rounded-none bg-base-200 shadow-md mb-6">
             <div className="card-body">
               <h2 className="text-lg font-semibold mb-3">Vote Tallies</h2>
               {(["yes", "no", "abstain"] as const).map(key => {
@@ -108,8 +108,8 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
                         {count} ({pct.toFixed(1)}%)
                       </span>
                     </div>
-                    <div className="w-full bg-base-300 rounded-full h-4">
-                      <div className={`${colors[key]} h-4 rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                    <div className="w-full bg-base-300 rounded-none h-4">
+                      <div className={`${colors[key]} h-4 rounded-none transition-all`} style={{ width: `${pct}%` }} />
                     </div>
                   </div>
                 );
@@ -119,7 +119,7 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
         )}
 
         {isAdmin && isAuthenticated && responses && responses.length > 0 && (
-          <div className="card bg-base-200 shadow-md mb-6">
+          <div className="card rounded-none bg-base-200 shadow-md mb-6">
             <div className="card-body">
               <h2 className="text-lg font-semibold mb-3">All Responses</h2>
               <div className="overflow-x-auto">
@@ -152,7 +152,7 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
 
         {/* Regular user view */}
         {!isAdmin && isAuthenticated && (
-          <div className="card bg-base-200 shadow-md mb-6">
+          <div className="card rounded-none bg-base-200 shadow-md mb-6">
             <div className="card-body">
               <h2 className="text-lg font-semibold mb-3">Your Larva&apos;s Response</h2>
               {userResponse ? (
@@ -176,7 +176,7 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
 
         {/* Not connected */}
         {!isAuthenticated && (
-          <div className="card bg-base-200 shadow-md">
+          <div className="card rounded-none bg-base-200 shadow-md">
             <div className="card-body items-center text-center">
               <p className="mb-3">Connect your wallet to see your larva&apos;s response</p>
               <RainbowKitCustomConnectButton />

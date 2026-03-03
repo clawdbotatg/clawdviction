@@ -56,7 +56,7 @@ const GovPage: NextPage = () => {
         ) : (
           <div className="space-y-4">
             {proposals.map(p => (
-              <div key={p.id} className="card bg-base-200 shadow-md">
+              <div key={p.id} className="card rounded-none bg-base-200 shadow-md">
                 <div className="card-body py-4 px-5">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
