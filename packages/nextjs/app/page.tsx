@@ -3,10 +3,13 @@
 import Link from "next/link";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
+import { Address } from "~~/components/scaffold-eth";
 import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
+import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 
 const Home: NextPage = () => {
   const { isConnected } = useAccount();
+  const { data: stakingContractData } = useDeployedContractInfo("ClawdVictionStaking");
 
   return (
     <div className="flex items-center flex-col flex-grow">
@@ -69,7 +72,7 @@ const Home: NextPage = () => {
         </div>
 
         {/* The Vision */}
-        <div className="mt-12 text-center max-w-2xl mb-16 w-full">
+        <div className="mt-12 text-center max-w-2xl mb-8 w-full">
           <div className="bg-base-100/60 backdrop-blur-sm rounded-none px-6 py-5">
             <h2 className="text-2xl font-bold">The Problem</h2>
             <p className="mt-4 text-base-content/60">
@@ -81,6 +84,14 @@ const Home: NextPage = () => {
             </Link>
           </div>
         </div>
+
+        {/* Contract Address */}
+        {stakingContractData?.address && (
+          <div className="mb-16 text-center flex flex-col items-center gap-1">
+            <p className="text-xs text-base-content/40 uppercase tracking-widest">Staking Contract</p>
+            <Address address={stakingContractData.address} />
+          </div>
+        )}
       </div>
     </div>
   );
