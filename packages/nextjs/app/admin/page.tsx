@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
-import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
+import { Address, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useAuth } from "~~/hooks/useAuth";
 import { authFetch } from "~~/lib/authFetch";
 
@@ -100,7 +100,6 @@ const AdminPage: NextPage = () => {
     );
   }
 
-  const truncate = (w: string) => `${w.slice(0, 6)}…${w.slice(-4)}`;
   const formatDate = (iso: string | null) => {
     if (!iso) return "—";
     return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -136,14 +135,7 @@ const AdminPage: NextPage = () => {
             {stakers.map(s => (
               <tr key={s.wallet} className="hover">
                 <td>
-                  <a
-                    href={`https://basescan.org/address/${s.wallet}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="link link-hover font-mono text-xs"
-                  >
-                    {truncate(s.wallet)}
-                  </a>
+                  <Address address={s.wallet} format="short" size="sm" />
                 </td>
                 <td className="text-right tabular-nums">{s.stakedM}</td>
                 <td className="text-right tabular-nums">
