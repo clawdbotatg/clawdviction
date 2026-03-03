@@ -118,6 +118,9 @@ const StakePage: NextPage = () => {
 
   // Track which unstake button is loading
   const [unstakingIndex, setUnstakingIndex] = useState<number | null>(null);
+  // Local pending states — lock button immediately on click, before isMining kicks in
+  const [pendingApprove, setPendingApprove] = useState(false);
+  const [pendingStake, setPendingStake] = useState(false);
 
   // Active stake indices now come directly from getActiveStakes (3rd return value)
 
@@ -253,23 +256,33 @@ const StakePage: NextPage = () => {
   // Handlers
   const handleApprove = async () => {
     if (!stakingContractData?.address || parsedAmount <= 0n) return;
-    await writeAndOpen(() =>
-      approveWrite({
-        functionName: "approve",
-        args: [stakingContractData.address, parsedAmount],
-      }),
-    );
+    setPendingApprove(true);
+    try {
+      await writeAndOpen(() =>
+        approveWrite({
+          functionName: "approve",
+          args: [stakingContractData.address, parsedAmount],
+        }),
+      );
+    } finally {
+      setPendingApprove(false);
+    }
   };
 
   const handleStake = async () => {
     if (parsedAmount <= 0n) return;
-    await writeAndOpen(() =>
-      stakeWrite({
-        functionName: "stake",
-        args: [parsedAmount],
-      }),
-    );
-    setStakeAmount("");
+    setPendingStake(true);
+    try {
+      await writeAndOpen(() =>
+        stakeWrite({
+          functionName: "stake",
+          args: [parsedAmount],
+        }),
+      );
+      setStakeAmount("");
+    } finally {
+      setPendingStake(false);
+    }
   };
 
   const handleUnstake = async (displayIndex: number) => {
@@ -405,9 +418,9 @@ const StakePage: NextPage = () => {
             <button
               className="btn btn-secondary w-full"
               onClick={handleApprove}
-              disabled={isApproving || parsedAmount <= 0n}
+              disabled={pendingApprove || isApproving || parsedAmount <= 0n}
             >
-              {isApproving ? (
+              {pendingApprove || isApproving ? (
                 <>
                   <span className="loading loading-spinner loading-sm"></span> Approving...
                 </>
@@ -416,8 +429,12 @@ const StakePage: NextPage = () => {
               )}
             </button>
           ) : (
-            <button className="btn btn-primary w-full" onClick={handleStake} disabled={isStaking || parsedAmount <= 0n}>
-              {isStaking ? (
+            <button
+              className="btn btn-primary w-full"
+              onClick={handleStake}
+              disabled={pendingStake || isStaking || parsedAmount <= 0n}
+            >
+              {pendingStake || isStaking ? (
                 <>
                   <span className="loading loading-spinner loading-sm"></span> Staking...
                 </>
