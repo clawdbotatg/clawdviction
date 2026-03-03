@@ -77,7 +77,7 @@ export default function CreateProposalPage() {
             </label>
             <input
               type="text"
-              className="input input-bordered w-full"
+              className="input input-bordered rounded-none w-full"
               value={title}
               onChange={e => setTitle(e.target.value)}
               placeholder="Proposal title"
@@ -117,7 +117,7 @@ export default function CreateProposalPage() {
               <span className="label-text">Question</span>
             </label>
             <textarea
-              className="textarea textarea-bordered w-full h-32"
+              className="textarea textarea-bordered rounded-none w-full h-32"
               value={question}
               onChange={e => setQuestion(e.target.value)}
               placeholder="What should the larvas respond to?"
