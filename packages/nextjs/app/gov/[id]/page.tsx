@@ -21,9 +21,24 @@ interface ProposalData {
   };
   responseCount: number;
   pendingCount: number;
-  responses?: { wallet: string; response: string; reasoning: string | null; created_at: string }[];
+  responses?: {
+    wallet: string;
+    response: string;
+    reasoning: string | null;
+    human_override: string | null;
+    human_note: string | null;
+    cv_balance: number;
+    created_at: string;
+  }[];
   tallies?: { yes: number; no: number; abstain: number };
-  userResponse?: { response: string; reasoning: string | null; created_at: string } | null;
+  userResponse?: {
+    response: string;
+    reasoning: string | null;
+    human_override: string | null;
+    human_note: string | null;
+    cv_balance: number;
+    created_at: string;
+  } | null;
   queueStatus?: string | null;
 }
 
@@ -33,24 +48,60 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
   const { isAuthenticated, authData } = useAuth(address);
   const [data, setData] = useState<ProposalData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [overrideLoading, setOverrideLoading] = useState(false);
+  const [annotateNote, setAnnotateNote] = useState("");
+  const [annotateLoading, setAnnotateLoading] = useState(false);
 
   const isAdmin = address?.toLowerCase() === ADMIN_WALLET;
 
+  const fetchData = async () => {
+    try {
+      const res = isAuthenticated
+        ? await authFetch(`/api/gov/${params.id}`, authData)
+        : await fetch(`/api/gov/${params.id}`);
+      const json = await res.json();
+      setData(json);
+    } catch {
+      /* ignore */
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = isAuthenticated
-          ? await authFetch(`/api/gov/${params.id}`, authData)
-          : await fetch(`/api/gov/${params.id}`);
-        const json = await res.json();
-        setData(json);
-      } catch {
-        /* ignore */
-      }
-      setLoading(false);
-    };
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id, isAuthenticated, authData]);
+
+  const handleOverride = async (vote: "yes" | "no" | "abstain") => {
+    if (!authData) return;
+    setOverrideLoading(true);
+    try {
+      await authFetch(`/api/gov/${params.id}/override`, authData, {
+        method: "POST",
+        body: JSON.stringify({ response: vote }),
+      });
+      await fetchData();
+    } catch {
+      /* ignore */
+    }
+    setOverrideLoading(false);
+  };
+
+  const handleAnnotate = async () => {
+    if (!authData || !annotateNote.trim()) return;
+    setAnnotateLoading(true);
+    try {
+      await authFetch(`/api/gov/${params.id}/annotate`, authData, {
+        method: "POST",
+        body: JSON.stringify({ note: annotateNote.trim() }),
+      });
+      setAnnotateNote("");
+      await fetchData();
+    } catch {
+      /* ignore */
+    }
+    setAnnotateLoading(false);
+  };
 
   if (loading) {
     return (
@@ -70,14 +121,14 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
   return (
     <div className="flex flex-col items-center min-h-screen pt-10 px-4">
       <div className="w-full max-w-3xl">
-        <Link href="/gov" className="btn btn-ghost btn-sm mb-4">
+        <Link href="/gov" className="btn btn-ghost btn-sm rounded-none mb-4">
           ← Back to Gov
         </Link>
 
         <div className="card rounded-none bg-base-200 shadow-md mb-6">
           <div className="card-body">
             <div className="flex items-center gap-2 mb-2">
-              <span className={`badge ${proposal.type === "vote" ? "badge-error" : "badge-info"}`}>
+              <span className={`badge rounded-none ${proposal.type === "vote" ? "badge-error" : "badge-info"}`}>
                 {proposal.type.toUpperCase()}
               </span>
               <span className="text-sm text-base-content/50">{new Date(proposal.created_at).toLocaleDateString()}</span>
@@ -127,8 +178,11 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
                   <thead>
                     <tr>
                       <th>Wallet</th>
+                      <th>CV Balance</th>
                       <th>{proposal.type === "vote" ? "Vote" : "Response"}</th>
+                      {proposal.type === "vote" && <th>Override</th>}
                       {proposal.type === "vote" && <th>Reasoning</th>}
+                      {proposal.type === "rfc" && <th>Human Note</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -137,9 +191,16 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
                         <td className="font-mono text-xs">
                           {r.wallet.slice(0, 6)}...{r.wallet.slice(-4)}
                         </td>
+                        <td className="text-xs font-mono">{Number(r.cv_balance).toFixed(1)}</td>
                         <td className="max-w-xs truncate">{r.response}</td>
                         {proposal.type === "vote" && (
+                          <td className="text-xs">{r.human_override ? r.human_override.toUpperCase() : "—"}</td>
+                        )}
+                        {proposal.type === "vote" && (
                           <td className="max-w-sm text-xs truncate">{r.reasoning || "—"}</td>
+                        )}
+                        {proposal.type === "rfc" && (
+                          <td className="max-w-sm text-xs truncate">{r.human_note || "—"}</td>
                         )}
                       </tr>
                     ))}
@@ -156,12 +217,67 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
             <div className="card-body">
               <h2 className="text-lg font-semibold mb-3">Your Larva&apos;s Response</h2>
               {userResponse ? (
-                <div className="chat chat-start">
-                  <div className="chat-bubble chat-bubble-primary whitespace-pre-wrap">
-                    {userResponse.response}
-                    {userResponse.reasoning && <p className="mt-2 text-sm opacity-80">{userResponse.reasoning}</p>}
+                <>
+                  <div className="chat chat-start">
+                    <div className="chat-bubble chat-bubble-primary rounded-none whitespace-pre-wrap">
+                      {userResponse.response}
+                      {userResponse.reasoning && <p className="mt-2 text-sm opacity-80">{userResponse.reasoning}</p>}
+                    </div>
                   </div>
-                </div>
+
+                  {/* Human vote override for vote proposals */}
+                  {proposal.type === "vote" && (
+                    <div className="mt-4">
+                      <p className="text-sm font-semibold mb-2">Override your larva&apos;s vote:</p>
+                      <div className="flex gap-2">
+                        {(["yes", "no", "abstain"] as const).map(vote => (
+                          <button
+                            key={vote}
+                            className={`btn btn-sm rounded-none ${
+                              userResponse.human_override === vote ? "btn-primary" : "btn-outline"
+                            }`}
+                            disabled={overrideLoading}
+                            onClick={() => handleOverride(vote)}
+                          >
+                            {vote.charAt(0).toUpperCase() + vote.slice(1)}
+                          </button>
+                        ))}
+                      </div>
+                      {userResponse.human_override && (
+                        <p className="text-xs text-base-content/50 mt-1">
+                          Your override: <span className="font-bold">{userResponse.human_override.toUpperCase()}</span>
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Human annotation for RFC proposals */}
+                  {proposal.type === "rfc" && (
+                    <div className="mt-4">
+                      {userResponse.human_note && (
+                        <div className="mb-3 p-3 bg-base-300 rounded-none">
+                          <p className="text-xs font-semibold mb-1">Your note:</p>
+                          <p className="text-sm whitespace-pre-wrap">{userResponse.human_note}</p>
+                        </div>
+                      )}
+                      <p className="text-sm font-semibold mb-2">Add your own note:</p>
+                      <textarea
+                        className="textarea textarea-bordered rounded-none w-full"
+                        placeholder="Your annotation..."
+                        value={annotateNote}
+                        onChange={e => setAnnotateNote(e.target.value)}
+                        rows={3}
+                      />
+                      <button
+                        className="btn btn-sm btn-primary rounded-none mt-2"
+                        disabled={annotateLoading || !annotateNote.trim()}
+                        onClick={handleAnnotate}
+                      >
+                        {annotateLoading ? "Submitting..." : "Submit"}
+                      </button>
+                    </div>
+                  )}
+                </>
               ) : queueStatus === "pending" || queueStatus === "processing" ? (
                 <div className="text-center py-4">
                   <span className="loading loading-dots loading-md"></span>
