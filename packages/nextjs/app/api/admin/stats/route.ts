@@ -67,5 +67,7 @@ export async function GET(request: NextRequest) {
     };
   });
 
+  stakers.sort((a, b) => parseFloat(b.liveCV) - parseFloat(a.liveCV));
+
   return NextResponse.json({ stakers });
 }
