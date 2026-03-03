@@ -69,9 +69,14 @@ async function chat(userMessage) {
   }
 }
 
+const CHAT_MAX_LENGTH = 500;
+
 app.post("/chat", async (req, res) => {
   const { message } = req.body;
   if (!message) return res.status(400).json({ error: "message required" });
+  if (typeof message !== "string" || message.length > CHAT_MAX_LENGTH) {
+    return res.status(400).json({ error: `Message too long (max ${CHAT_MAX_LENGTH} characters)` });
+  }
   const reply = await chat(message);
   res.json({ message: reply });
 });
