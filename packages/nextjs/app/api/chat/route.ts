@@ -3,7 +3,7 @@ import { createPublicClient, formatUnits, http } from "viem";
 import { base } from "viem/chains";
 import { compressMemory, initDb, isDbAvailable, sql } from "~~/lib/db";
 import { LARVA_BASE_PROMPT } from "~~/lib/larvaContext";
-import { formatAnswersAsQA } from "~~/lib/questions";
+import { CHAT_MAX_LENGTH, formatAnswersAsQA } from "~~/lib/questions";
 import { verifyAuth } from "~~/lib/verifyAuth";
 
 const LARVA_SYSTEM_PROMPT = LARVA_BASE_PROMPT;
@@ -240,6 +240,10 @@ export async function POST(request: NextRequest) {
 
     if (!wallet || !message) {
       return NextResponse.json({ error: "Missing wallet or message" }, { status: 400 });
+    }
+
+    if (typeof message !== "string" || message.length > CHAT_MAX_LENGTH) {
+      return NextResponse.json({ error: `Message too long (max ${CHAT_MAX_LENGTH} characters)` }, { status: 400 });
     }
 
     if (verified !== wallet.toLowerCase()) {

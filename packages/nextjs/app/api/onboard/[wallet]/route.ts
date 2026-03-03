@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initDb, isDbAvailable, sql } from "~~/lib/db";
+import { MAX_LENGTH_MAIN } from "~~/lib/questions";
 import { verifyAuth } from "~~/lib/verifyAuth";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ wallet: string }> }) {
@@ -42,6 +43,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const { answers } = await request.json();
+
+    // Validate answer lengths — no single answer should exceed MAX_LENGTH_MAIN
+    if (answers && typeof answers === "object") {
+      for (const val of Object.values(answers)) {
+        if (typeof val === "string" && val.length > MAX_LENGTH_MAIN) {
+          return NextResponse.json({ error: `Answer too long (max ${MAX_LENGTH_MAIN} characters per field)` }, { status: 400 });
+        }
+      }
+    }
 
     // Save raw answers directly — no summarization. The larva gets the full Q&A.
     await initDb();
