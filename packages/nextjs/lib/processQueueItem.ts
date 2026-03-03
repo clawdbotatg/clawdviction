@@ -15,11 +15,14 @@ export async function processQueueItem(item: QueueItem, apiKey: string): Promise
   // Mark processing
   await sql`UPDATE governance_queue SET status = 'processing' WHERE id = ${item.id}`;
 
+  // Normalise to lowercase for all DB lookups — tables may store mixed-case addresses
+  const walletLower = item.wallet.toLowerCase();
+
   // Fetch onboarding answers
   let onboardingContext = "";
   try {
     const seedResult = await sql`
-      SELECT answers FROM larva_seeds WHERE wallet = ${item.wallet} AND completed = true`;
+      SELECT answers FROM larva_seeds WHERE LOWER(wallet) = ${walletLower} AND completed = true`;
     if (seedResult.rows.length > 0 && seedResult.rows[0].answers) {
       onboardingContext = formatAnswersAsQA(seedResult.rows[0].answers as Record<string, string>);
     }
@@ -31,7 +34,7 @@ export async function processQueueItem(item: QueueItem, apiKey: string): Promise
   let memorySnapshot = "";
   try {
     const snapResult = await sql`
-      SELECT snapshot FROM memory_snapshots WHERE wallet = ${item.wallet}`;
+      SELECT snapshot FROM memory_snapshots WHERE LOWER(wallet) = ${walletLower}`;
     if (snapResult.rows.length > 0 && snapResult.rows[0].snapshot) {
       memorySnapshot = snapResult.rows[0].snapshot as string;
     }
@@ -44,7 +47,7 @@ export async function processQueueItem(item: QueueItem, apiKey: string): Promise
   try {
     const chatResult = await sql`
       SELECT role, content FROM chat_messages
-      WHERE wallet = ${item.wallet}
+      WHERE LOWER(wallet) = ${walletLower}
       ORDER BY created_at DESC LIMIT 30`;
     if (chatResult.rows.length > 0) {
       chatContext = chatResult.rows

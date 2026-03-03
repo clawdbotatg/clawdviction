@@ -267,8 +267,8 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
               <h2 className="text-lg font-semibold mb-3">Your Larva&apos;s Response</h2>
               {userResponse ? (
                 <>
-                  <div className="chat chat-start">
-                    <div className="chat-bubble chat-bubble-primary rounded-none whitespace-pre-wrap">
+                  <div>
+                    <div className="bg-primary text-primary-content px-4 py-3 whitespace-pre-wrap">
                       {userResponse.response}
                       {userResponse.reasoning && <p className="mt-2 text-sm opacity-80">{userResponse.reasoning}</p>}
                     </div>
