@@ -5,9 +5,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { hardhat } from "viem/chains";
+import { useAccount } from "wagmi";
 import { Bars3Icon } from "@heroicons/react/24/outline";
 import { FaucetButton, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useOutsideClick, useTargetNetwork } from "~~/hooks/scaffold-eth";
+
+const ADMIN_WALLET = "0x11ce532845ce0eacda41f72fdc1c88c335981442";
 
 type HeaderMenuLink = {
   label: string;
@@ -40,10 +43,14 @@ export const menuLinks: HeaderMenuLink[] = [
 
 export const HeaderMenuLinks = () => {
   const pathname = usePathname();
+  const { address } = useAccount();
+  const isAdmin = address?.toLowerCase() === ADMIN_WALLET;
+
+  const allLinks = isAdmin ? [...menuLinks, { label: "Admin", href: "/admin" }] : menuLinks;
 
   return (
     <>
-      {menuLinks.map(({ label, href, icon }) => {
+      {allLinks.map(({ label, href, icon }) => {
         const isActive = pathname === href;
         return (
           <li key={href}>
