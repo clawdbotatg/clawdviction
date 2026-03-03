@@ -1,4 +1,4 @@
-import { sql } from "~~/lib/db";
+import { compressMemory, sql } from "~~/lib/db";
 import { LARVA_BASE_PROMPT } from "~~/lib/larvaContext";
 import { formatAnswersAsQA } from "~~/lib/questions";
 
@@ -18,6 +18,16 @@ export async function processQueueItem(item: QueueItem, apiKey: string): Promise
   // Normalise to lowercase for all DB lookups — tables may store mixed-case addresses
   const walletLower = item.wallet.toLowerCase();
 
+  // If no memory snapshot exists yet, try to build one now before responding
+  try {
+    const snapCheck = await sql`SELECT snapshot FROM memory_snapshots WHERE LOWER(wallet) = ${walletLower}`;
+    if (snapCheck.rows.length === 0 || !snapCheck.rows[0].snapshot) {
+      await compressMemory(walletLower);
+    }
+  } catch {
+    /* ignore — best effort */
+  }
+
   // Fetch onboarding answers
   let onboardingContext = "";
   try {
@@ -30,7 +40,7 @@ export async function processQueueItem(item: QueueItem, apiKey: string): Promise
     /* ignore */
   }
 
-  // Fetch memory snapshot
+  // Fetch memory snapshot (may have just been created above)
   let memorySnapshot = "";
   try {
     const snapResult = await sql`
@@ -101,12 +111,12 @@ export async function processQueueItem(item: QueueItem, apiKey: string): Promise
     reasoning = lines.slice(1).join("\n").trim() || null;
   }
 
-  // Store response
+  // Store response — replace existing
   await sql`
     INSERT INTO governance_responses (proposal_id, wallet, response, reasoning)
     VALUES (${item.proposal_id}, ${item.wallet}, ${responseText}, ${reasoning})
     ON CONFLICT (proposal_id, wallet) DO UPDATE SET
-      response = ${responseText}, reasoning = ${reasoning}`;
+      response = ${responseText}, reasoning = ${reasoning}, created_at = NOW()`;
 
   await sql`UPDATE governance_queue SET status = 'done', processed_at = NOW() WHERE id = ${item.id}`;
 

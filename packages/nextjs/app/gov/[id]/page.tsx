@@ -52,6 +52,7 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
   const [annotateNote, setAnnotateNote] = useState("");
   const [annotateLoading, setAnnotateLoading] = useState(false);
   const [collectLoading, setCollectLoading] = useState(false);
+  const [refetchLoading, setRefetchLoading] = useState(false);
   const [collectResults, setCollectResults] = useState<{ wallet: string; response: string }[] | null>(null);
 
   const isAdmin = address?.toLowerCase() === ADMIN_WALLET;
@@ -144,11 +145,11 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
           </div>
         </div>
 
-        {/* Admin: Collect Responses button */}
-        {isAdmin && isAuthenticated && pendingCount > 0 && (
+        {/* Admin: Collect / Refetch Responses */}
+        {isAdmin && isAuthenticated && (
           <div className="card rounded-none bg-base-200 shadow-md mb-6">
             <div className="card-body">
-              <h2 className="text-lg font-semibold mb-3">Pending Responses</h2>
+              <h2 className="text-lg font-semibold mb-3">Admin: Responses</h2>
               {collectResults ? (
                 <>
                   <p className="text-sm mb-3">Processed {collectResults.length} responses:</p>
@@ -160,32 +161,75 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
                       <span>→ {r.response}</span>
                     </div>
                   ))}
+                  <button className="btn btn-ghost btn-sm rounded-none mt-3" onClick={() => setCollectResults(null)}>
+                    Reset
+                  </button>
                 </>
               ) : (
-                <button
-                  className="btn btn-primary rounded-none"
-                  disabled={collectLoading}
-                  onClick={async () => {
-                    if (!authData) return;
-                    setCollectLoading(true);
-                    setCollectResults(null);
-                    try {
-                      const res = await authFetch(`/api/gov/${params.id}/queue/trigger`, authData, {
-                        method: "POST",
-                      });
-                      const json = await res.json();
-                      setCollectResults(json.results || []);
-                      await fetchData();
-                    } catch {
-                      /* ignore */
-                    }
-                    setCollectLoading(false);
-                  }}
-                >
-                  {collectLoading
-                    ? `Processing ${pendingCount} pending responses...`
-                    : `Collect Responses (${pendingCount})`}
-                </button>
+                <div className="flex gap-3">
+                  {pendingCount > 0 && (
+                    <button
+                      className="btn btn-primary rounded-none"
+                      disabled={collectLoading || refetchLoading}
+                      onClick={async () => {
+                        if (!authData) return;
+                        setCollectLoading(true);
+                        setCollectResults(null);
+                        try {
+                          const res = await authFetch(`/api/gov/${params.id}/queue/trigger`, authData, {
+                            method: "POST",
+                            body: JSON.stringify({}),
+                          });
+                          const json = await res.json();
+                          setCollectResults(json.results || []);
+                          await fetchData();
+                        } catch {
+                          /* ignore */
+                        }
+                        setCollectLoading(false);
+                      }}
+                    >
+                      {collectLoading ? (
+                        <>
+                          <span className="loading loading-spinner loading-sm" />
+                          Processing {pendingCount}...
+                        </>
+                      ) : (
+                        `Collect Responses (${pendingCount} pending)`
+                      )}
+                    </button>
+                  )}
+                  <button
+                    className="btn btn-outline rounded-none"
+                    disabled={collectLoading || refetchLoading}
+                    onClick={async () => {
+                      if (!authData) return;
+                      setRefetchLoading(true);
+                      setCollectResults(null);
+                      try {
+                        const res = await authFetch(`/api/gov/${params.id}/queue/trigger`, authData, {
+                          method: "POST",
+                          body: JSON.stringify({ refetch: true }),
+                        });
+                        const json = await res.json();
+                        setCollectResults(json.results || []);
+                        await fetchData();
+                      } catch {
+                        /* ignore */
+                      }
+                      setRefetchLoading(false);
+                    }}
+                  >
+                    {refetchLoading ? (
+                      <>
+                        <span className="loading loading-spinner loading-sm" />
+                        Regenerating...
+                      </>
+                    ) : (
+                      "↺ Regenerate All Responses"
+                    )}
+                  </button>
+                </div>
               )}
             </div>
           </div>

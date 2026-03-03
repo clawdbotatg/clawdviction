@@ -21,6 +21,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     await initDb();
 
+    const body = await request.json().catch(() => ({}));
+    const refetch = body?.refetch === true;
+
+    if (refetch) {
+      // Re-queue all wallets that already responded so we can regenerate their response
+      await sql`
+        UPDATE governance_queue SET status = 'pending', processed_at = NULL
+        WHERE proposal_id = ${id} AND status = 'done'`;
+    }
+
     const pending = await sql`
       SELECT q.id, q.proposal_id, q.wallet, p.type, p.title, p.question
       FROM governance_queue q
