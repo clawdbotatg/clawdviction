@@ -363,6 +363,19 @@ export async function POST(request: NextRequest) {
 
       const data = await response.json();
 
+      // Handle API errors (overload, auth failure, invalid model, etc.)
+      if (!response.ok || data.type === "error") {
+        const errMsg = data?.error?.message ?? `HTTP ${response.status}`;
+        console.error("Anthropic API error:", response.status, JSON.stringify(data));
+        if (response.status === 529 || data?.error?.type === "overloaded_error") {
+          assistantMessage = "🦞 Sorry, I'm overloaded right now — try again in a moment.";
+        } else {
+          assistantMessage = `🦞 Something went wrong on my end (${response.status}). Try again soon.`;
+        }
+        console.error("Larva API error detail:", errMsg);
+        break;
+      }
+
       if (data.stop_reason === "tool_use") {
         // Add assistant message with tool_use blocks
         currentMessages.push({ role: "assistant", content: data.content });
@@ -383,6 +396,8 @@ export async function POST(request: NextRequest) {
       if (Array.isArray(data.content)) {
         const textBlock = data.content.find((b: { type: string }) => b.type === "text");
         if (textBlock) assistantMessage = textBlock.text;
+      } else {
+        console.error("Unexpected Anthropic response shape:", JSON.stringify(data).slice(0, 500));
       }
       break;
     }
