@@ -51,6 +51,8 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
   const [overrideLoading, setOverrideLoading] = useState(false);
   const [annotateNote, setAnnotateNote] = useState("");
   const [annotateLoading, setAnnotateLoading] = useState(false);
+  const [collectLoading, setCollectLoading] = useState(false);
+  const [collectResults, setCollectResults] = useState<{ wallet: string; response: string }[] | null>(null);
 
   const isAdmin = address?.toLowerCase() === ADMIN_WALLET;
 
@@ -141,6 +143,53 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
             </p>
           </div>
         </div>
+
+        {/* Admin: Collect Responses button */}
+        {isAdmin && isAuthenticated && pendingCount > 0 && (
+          <div className="card rounded-none bg-base-200 shadow-md mb-6">
+            <div className="card-body">
+              <h2 className="text-lg font-semibold mb-3">Pending Responses</h2>
+              {collectResults ? (
+                <>
+                  <p className="text-sm mb-3">Processed {collectResults.length} responses:</p>
+                  {collectResults.map((r, i) => (
+                    <div key={i} className="flex gap-2 text-sm mb-1">
+                      <span className="font-mono text-xs">
+                        {r.wallet.slice(0, 6)}...{r.wallet.slice(-4)}
+                      </span>
+                      <span>→ {r.response}</span>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <button
+                  className="btn btn-primary rounded-none"
+                  disabled={collectLoading}
+                  onClick={async () => {
+                    if (!authData) return;
+                    setCollectLoading(true);
+                    setCollectResults(null);
+                    try {
+                      const res = await authFetch(`/api/gov/${params.id}/queue/trigger`, authData, {
+                        method: "POST",
+                      });
+                      const json = await res.json();
+                      setCollectResults(json.results || []);
+                      await fetchData();
+                    } catch {
+                      /* ignore */
+                    }
+                    setCollectLoading(false);
+                  }}
+                >
+                  {collectLoading
+                    ? `Processing ${pendingCount} pending responses...`
+                    : `Collect Responses (${pendingCount})`}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Admin view: vote tallies + full responses */}
         {isAdmin && isAuthenticated && tallies && totalVotes > 0 && (
