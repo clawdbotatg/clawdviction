@@ -118,9 +118,8 @@ const StakePage: NextPage = () => {
 
   // Track which unstake button is loading
   const [unstakingIndex, setUnstakingIndex] = useState<number | null>(null);
-  // Local pending states — lock button immediately on click, before isMining kicks in
-  const [pendingApprove, setPendingApprove] = useState(false);
-  const [pendingStake, setPendingStake] = useState(false);
+  // Hold approve button disabled for 4s after tx confirms while allowance state catches up
+  const [approveCooldown, setApproveCooldown] = useState(false);
 
   // Active stake indices now come directly from getActiveStakes (3rd return value)
 
@@ -256,33 +255,26 @@ const StakePage: NextPage = () => {
   // Handlers
   const handleApprove = async () => {
     if (!stakingContractData?.address || parsedAmount <= 0n) return;
-    setPendingApprove(true);
-    try {
-      await writeAndOpen(() =>
-        approveWrite({
-          functionName: "approve",
-          args: [stakingContractData.address, parsedAmount],
-        }),
-      );
-    } finally {
-      setPendingApprove(false);
-    }
+    await writeAndOpen(() =>
+      approveWrite({
+        functionName: "approve",
+        args: [stakingContractData.address, parsedAmount],
+      }),
+    );
+    // Hold button disabled for 4s while allowance state refreshes
+    setApproveCooldown(true);
+    setTimeout(() => setApproveCooldown(false), 4000);
   };
 
   const handleStake = async () => {
     if (parsedAmount <= 0n) return;
-    setPendingStake(true);
-    try {
-      await writeAndOpen(() =>
-        stakeWrite({
-          functionName: "stake",
-          args: [parsedAmount],
-        }),
-      );
-      setStakeAmount("");
-    } finally {
-      setPendingStake(false);
-    }
+    await writeAndOpen(() =>
+      stakeWrite({
+        functionName: "stake",
+        args: [parsedAmount],
+      }),
+    );
+    setStakeAmount("");
   };
 
   const handleUnstake = async (displayIndex: number) => {
@@ -332,7 +324,7 @@ const StakePage: NextPage = () => {
       <div className="flex items-center flex-col flex-grow pt-20">
         <div className="text-6xl mb-4">🦀</div>
         <RainbowKitCustomConnectButton />
-        <div className="bg-base-100/60 backdrop-blur-sm rounded-xl px-5 py-3 mt-6">
+        <div className="bg-base-100/60 backdrop-blur-sm rounded-none px-5 py-3 mt-6">
           <p className="text-base-content/60">Connect your wallet to start staking $CLAWD</p>
         </div>
       </div>
@@ -341,13 +333,13 @@ const StakePage: NextPage = () => {
 
   return (
     <div className="flex flex-col items-center flex-grow pt-10 px-5">
-      <div className="bg-base-100/60 backdrop-blur-sm rounded-xl px-5 py-2 mb-8">
+      <div className="bg-base-100/60 backdrop-blur-sm rounded-none px-5 py-2 mb-8">
         <p className="text-base-content/60">Earn clawdviction. Grow your governance power. 🦀</p>
       </div>
 
       {/* Stats */}
       <div className="grid md:grid-cols-3 gap-4 w-full max-w-4xl mb-8">
-        <div className="stat bg-base-200 rounded-xl shadow">
+        <div className="stat bg-base-200 rounded-none shadow">
           <div className="stat-title">Your Staked</div>
           <div className="stat-value text-error text-2xl">{totalStaked ? formatClawd(totalStaked) : "0"} CLAWD</div>
           {clawdUsdPrice && totalStaked && totalStaked > 0n && (
@@ -359,13 +351,13 @@ const StakePage: NextPage = () => {
             </div>
           )}
         </div>
-        <div className="stat bg-base-200 rounded-xl shadow">
+        <div className="stat bg-base-200 rounded-none shadow">
           <div className="stat-title">Your ClawdViction</div>
           <div className="stat-value text-error text-2xl tabular-nums">
             {formatClawdviction(liveClawdviction ?? clawdvictionScore ?? "0", true)} 🦀
           </div>
         </div>
-        <div className="stat bg-base-200 rounded-xl shadow">
+        <div className="stat bg-base-200 rounded-none shadow">
           <div className="stat-title">Total Staked (All)</div>
           <div className="stat-value text-2xl">{totalSupplyStaked ? formatClawd(totalSupplyStaked) : "0"}</div>
         </div>
@@ -381,7 +373,7 @@ const StakePage: NextPage = () => {
       )}
 
       {/* Staking Form */}
-      <div className="card bg-base-200 shadow-lg w-full max-w-lg">
+      <div className="card rounded-none bg-base-200 shadow-lg w-full max-w-lg">
         <div className="card-body">
           <h2 className="card-title">Stake Tokens</h2>
           <p className="text-sm text-base-content/60 mb-4">
@@ -394,7 +386,7 @@ const StakePage: NextPage = () => {
           <input
             type="number"
             placeholder="Amount to stake"
-            className="input input-bordered w-full mb-4"
+            className="input input-bordered rounded-none w-full mb-4"
             value={stakeAmount}
             onChange={e => setStakeAmount(e.target.value)}
           />
@@ -418,9 +410,9 @@ const StakePage: NextPage = () => {
             <button
               className="btn btn-secondary w-full"
               onClick={handleApprove}
-              disabled={pendingApprove || isApproving || parsedAmount <= 0n}
+              disabled={isApproving || approveCooldown || parsedAmount <= 0n}
             >
-              {pendingApprove || isApproving ? (
+              {isApproving || approveCooldown ? (
                 <>
                   <span className="loading loading-spinner loading-sm"></span> Approving...
                 </>
@@ -429,12 +421,8 @@ const StakePage: NextPage = () => {
               )}
             </button>
           ) : (
-            <button
-              className="btn btn-primary w-full"
-              onClick={handleStake}
-              disabled={pendingStake || isStaking || parsedAmount <= 0n}
-            >
-              {pendingStake || isStaking ? (
+            <button className="btn btn-primary w-full" onClick={handleStake} disabled={isStaking || parsedAmount <= 0n}>
+              {isStaking ? (
                 <>
                   <span className="loading loading-spinner loading-sm"></span> Staking...
                 </>
@@ -464,12 +452,12 @@ const StakePage: NextPage = () => {
 
       {/* Active Stakes */}
       {activeStakesData && activeStakesData[0] && activeStakesData[0].length > 0 && (
-        <div className="card bg-base-200 shadow-lg w-full max-w-lg mt-6">
+        <div className="card rounded-none bg-base-200 shadow-lg w-full max-w-lg mt-6">
           <div className="card-body">
             <h2 className="card-title">Your Stakes</h2>
             <div className="space-y-3">
               {activeStakesData[0].map((amount: bigint, i: number) => (
-                <div key={i} className="flex items-center justify-between bg-base-100 rounded-lg p-3">
+                <div key={i} className="flex items-center justify-between bg-base-100 rounded-none p-3">
                   <div>
                     <span className="font-bold">{formatClawd(amount)} CLAWD</span>
                     {clawdUsdPrice && amount > 0n && (

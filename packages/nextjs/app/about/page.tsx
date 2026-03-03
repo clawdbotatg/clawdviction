@@ -6,7 +6,7 @@ import type { NextPage } from "next";
 const AboutPage: NextPage = () => {
   return (
     <div className="flex flex-col items-center flex-grow pt-10 px-5">
-      <div className="max-w-2xl bg-base-100/60 backdrop-blur-sm rounded-2xl px-8 py-6">
+      <div className="max-w-2xl bg-base-100/60 backdrop-blur-sm rounded-none px-8 py-6">
         <h1 className="text-3xl font-bold mb-6">
           <span className="bg-gradient-to-r from-red-500 to-red-300 bg-clip-text text-transparent">
             About ClawdViction

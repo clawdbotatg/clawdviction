@@ -217,7 +217,7 @@ const ChatPage: NextPage = () => {
       <div className="flex items-center flex-col flex-grow pt-20">
         <div className="text-6xl mb-4">🦀</div>
         <RainbowKitCustomConnectButton />
-        <div className="bg-base-100/60 backdrop-blur-sm rounded-xl px-5 py-3 mt-6">
+        <div className="bg-base-100/60 backdrop-blur-sm rounded-none px-5 py-3 mt-6">
           <p className="text-base-content/60">Connect your wallet to meet your larva.</p>
         </div>
       </div>
@@ -229,7 +229,7 @@ const ChatPage: NextPage = () => {
     return (
       <div className="flex items-center flex-col flex-grow pt-20 px-5">
         <div className="text-6xl mb-4">🔐🦞📡</div>
-        <div className="bg-base-100/60 backdrop-blur-sm rounded-xl px-6 py-5 text-center max-w-md">
+        <div className="bg-base-100/60 backdrop-blur-sm rounded-none px-6 py-5 text-center max-w-md">
           <h2 className="text-2xl font-bold mb-2">Connect to $CLAWD Larvae</h2>
           <p className="text-base-content/60 mb-5">
             Sign a message to prove you own this wallet. It&apos;s free, takes one click, and lasts a week.
@@ -255,7 +255,7 @@ const ChatPage: NextPage = () => {
     return (
       <div className="flex items-center flex-col flex-grow pt-20 px-5">
         <div className="text-6xl mb-4">🦞</div>
-        <div className="bg-base-100/60 backdrop-blur-sm rounded-xl px-6 py-4 mb-6 text-center max-w-md">
+        <div className="bg-base-100/60 backdrop-blur-sm rounded-none px-6 py-4 mb-6 text-center max-w-md">
           <h2 className="text-2xl font-bold mb-2">Earn More ClawdViction</h2>
           <p className="text-base-content/60">
             You need 1,000,000 clawdviction to unlock your personal larva. Stake $CLAWD and let it grow over time.
@@ -276,7 +276,7 @@ const ChatPage: NextPage = () => {
   if (!larvaRunning) {
     return (
       <div className="flex flex-col flex-grow pt-6 px-5 max-w-3xl mx-auto w-full">
-        <div className="bg-base-100/60 backdrop-blur-sm rounded-2xl px-8 py-16 text-center">
+        <div className="bg-base-100/60 backdrop-blur-sm rounded-none px-8 py-16 text-center">
           <div className="text-6xl mb-4">🦞</div>
           <h2 className="text-2xl font-bold mb-2">Your Larva is Ready to Hatch</h2>
           <p className="text-base-content/60 mb-6">Launch your personal AI governance agent.</p>
@@ -327,7 +327,7 @@ const ChatPage: NextPage = () => {
                 {msg.role === "assistant" ? "🦀 Larva" : "You"}
               </span>
               <div
-                className={`max-w-[75%] px-4 py-2 rounded-lg text-base break-words ${
+                className={`max-w-[75%] px-4 py-2 rounded-none text-base break-words ${
                   msg.role === "user" ? "bg-primary text-primary-content" : "bg-base-200 text-base-content"
                 }`}
               >
@@ -338,7 +338,7 @@ const ChatPage: NextPage = () => {
           {loading && (
             <div className="flex flex-col items-start">
               <span className="text-xs text-base-content/40 mb-1 px-1">🦀 Larva</span>
-              <div className="bg-base-200 rounded-lg px-4 py-2">
+              <div className="bg-base-200 rounded-none px-4 py-2">
                 <span className="loading loading-dots loading-sm"></span>
               </div>
             </div>
@@ -388,7 +388,7 @@ const ChatPage: NextPage = () => {
                 }}
                 placeholder="Talk to your larva..."
                 rows={1}
-                className="textarea textarea-bordered flex-1 resize-none"
+                className="textarea textarea-bordered rounded-none flex-1 resize-none"
                 style={{ minHeight: "2.75rem", maxHeight: "10rem", overflowY: "auto" }}
               />
               <button onClick={sendMessage} disabled={loading || !input.trim()} className="btn btn-primary">

@@ -26,7 +26,7 @@ const Home: NextPage = () => {
       {/* Below fold — subtitle + cards + vision */}
       <div className="flex flex-col items-center w-full px-5">
         {/* Subtitle */}
-        <div className="bg-base-100/60 backdrop-blur-sm rounded-xl px-6 py-4 text-center max-w-2xl w-full">
+        <div className="bg-base-100/60 backdrop-blur-sm rounded-none px-6 py-4 text-center max-w-2xl w-full">
           <p className="text-xl text-base-content/70">
             AI-powered conviction governance for $CLAWD holders.
             <br />
@@ -36,7 +36,7 @@ const Home: NextPage = () => {
 
         {/* How it works */}
         <div className="grid md:grid-cols-3 gap-6 mt-8 max-w-5xl w-full">
-          <div className="card bg-base-200 shadow-lg">
+          <div className="card rounded-none bg-base-200 shadow-lg">
             <div className="card-body">
               <div className="text-3xl">🥩</div>
               <h2 className="card-title text-error">Stake $CLAWD</h2>
@@ -46,7 +46,7 @@ const Home: NextPage = () => {
             </div>
           </div>
 
-          <div className="card bg-base-200 shadow-lg">
+          <div className="card rounded-none bg-base-200 shadow-lg">
             <div className="card-body">
               <div className="text-3xl">🧠</div>
               <h2 className="card-title text-error">Train Your Larva</h2>
@@ -56,7 +56,7 @@ const Home: NextPage = () => {
             </div>
           </div>
 
-          <div className="card bg-base-200 shadow-lg">
+          <div className="card rounded-none bg-base-200 shadow-lg">
             <div className="card-body">
               <div className="text-3xl">🗳️</div>
               <h2 className="card-title text-error">Govern Together</h2>
@@ -70,7 +70,7 @@ const Home: NextPage = () => {
 
         {/* The Vision */}
         <div className="mt-12 text-center max-w-2xl mb-16 w-full">
-          <div className="bg-base-100/60 backdrop-blur-sm rounded-xl px-6 py-5">
+          <div className="bg-base-100/60 backdrop-blur-sm rounded-none px-6 py-5">
             <h2 className="text-2xl font-bold">The Problem</h2>
             <p className="mt-4 text-base-content/60">
               DAOs fail because nobody has time to be informed on everything. Delegation just creates mini-oligarchies.
