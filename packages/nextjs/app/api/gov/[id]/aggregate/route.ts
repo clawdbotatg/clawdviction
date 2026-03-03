@@ -1,0 +1,90 @@
+import { NextRequest, NextResponse } from "next/server";
+import { initDb, sql } from "~~/lib/db";
+import { verifyAuth } from "~~/lib/verifyAuth";
+
+const ADMIN_WALLET = "0x11ce532845ce0eacda41f72fdc1c88c335981442";
+
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const wallet = await verifyAuth(request);
+    if (!wallet || wallet.toLowerCase() !== ADMIN_WALLET) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const { id: idStr } = await params;
+    const id = parseInt(idStr);
+    if (isNaN(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return NextResponse.json({ error: "No API key" }, { status: 500 });
+
+    await initDb();
+
+    // Migration
+    await sql`ALTER TABLE governance_proposals ADD COLUMN IF NOT EXISTS aggregated_opinion TEXT`;
+
+    // Fetch proposal
+    const propResult = await sql`SELECT * FROM governance_proposals WHERE id = ${id}`;
+    if (propResult.rows.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const proposal = propResult.rows[0];
+
+    // Fetch all responses, sorted by CV balance descending
+    const responses = await sql`
+      SELECT gr.wallet, gr.response, gr.reasoning, gr.human_override, gr.human_note,
+             COALESCE(cb.balance, 0)::numeric as cv_balance
+      FROM governance_responses gr
+      LEFT JOIN clawdviction_balances cb ON LOWER(gr.wallet) = LOWER(cb.wallet)
+      WHERE gr.proposal_id = ${id}
+      ORDER BY cv_balance DESC`;
+
+    if (responses.rows.length === 0) {
+      return NextResponse.json({ error: "No responses to aggregate" }, { status: 400 });
+    }
+
+    // Format responses for the prompt
+    const formatted = responses.rows
+      .map((r, i) => {
+        const effectiveResponse = r.human_override || r.response;
+        const note = r.human_note ? `\n  Human note: ${r.human_note}` : "";
+        const cv = parseFloat(r.cv_balance).toFixed(0);
+        return `${i + 1}. Wallet ${r.wallet.slice(0, 6)}...${r.wallet.slice(-4)} (${cv} CV)\n  Response: ${effectiveResponse}${r.reasoning ? `\n  Reasoning: ${r.reasoning}` : ""}${note}`;
+      })
+      .join("\n\n");
+
+    const systemPrompt =
+      proposal.type === "vote"
+        ? `You are synthesizing the results of a governance vote for $CLAWD token holders. Each holder's AI larva voted on their behalf, weighted by their CV (ClawdViction) score. Analyze the votes, note the majority position, highlight any interesting dissent or reasoning, and deliver a clear ruling. Be direct and decisive. 2-4 paragraphs.`
+        : `You are synthesizing community feedback on a governance RFC for $CLAWD token holders. Each holder's AI larva submitted a comment on their behalf, weighted by their CV (ClawdViction) score. Identify the dominant themes, areas of consensus, notable disagreements, and form an aggregated community opinion. Be insightful and direct. 2-4 paragraphs.`;
+
+    const userPrompt = `Proposal: "${proposal.title}"\nQuestion: ${proposal.question}\n\nResponses (sorted by CV weight, highest first):\n\n${formatted}\n\n${proposal.type === "vote" ? "Form a ruling based on these votes." : "Form an aggregated community opinion from these comments."}`;
+
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-5",
+        max_tokens: 800,
+        messages: [{ role: "user", content: systemPrompt + "\n\n" + userPrompt }],
+      }),
+    });
+
+    const data = await res.json();
+    const opinion = data.content?.[0]?.text;
+    if (!opinion) return NextResponse.json({ error: "No response from model" }, { status: 500 });
+
+    // Store on the proposal
+    await sql`
+      UPDATE governance_proposals
+      SET aggregated_opinion = ${opinion}
+      WHERE id = ${id}`;
+
+    return NextResponse.json({ opinion });
+  } catch (error) {
+    console.error("POST /api/gov/[id]/aggregate error:", error);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+  }
+}
