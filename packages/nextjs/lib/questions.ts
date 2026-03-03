@@ -3,6 +3,7 @@
 // Default char limits — keep answers substantive but bounded
 export const MAX_LENGTH_MAIN = 500; // main textarea answers
 export const MAX_LENGTH_NOTES = 300; // sub-prompt notes (checklist / scale)
+export const CHAT_MAX_LENGTH = 500; // chat message input
 
 export const QUESTIONS = [
   {

@@ -8,6 +8,7 @@ import { OnboardingInterview } from "~~/components/OnboardingInterview";
 import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useAuth } from "~~/hooks/useAuth";
 import { authFetch } from "~~/lib/authFetch";
+import { CHAT_MAX_LENGTH } from "~~/lib/questions";
 
 const CLAWDVICTION_THRESHOLD = 1_000_000n; // Must have this much CV to send a message (backend deducts 50K after)
 
@@ -139,7 +140,7 @@ const ChatPage: NextPage = () => {
   };
 
   const sendMessage = async () => {
-    if (!input.trim() || loading) return;
+    if (!input.trim() || loading || input.length > CHAT_MAX_LENGTH) return;
     const userMessage = input.trim();
     setInput("");
     const updatedMessages: Message[] = [...messages, { role: "user", content: userMessage }];
@@ -379,7 +380,7 @@ const ChatPage: NextPage = () => {
             <div className="flex gap-2 items-end">
               <textarea
                 value={input}
-                onChange={e => setInput(e.target.value)}
+                onChange={e => setInput(e.target.value.slice(0, CHAT_MAX_LENGTH))}
                 onKeyDown={e => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
@@ -388,16 +389,24 @@ const ChatPage: NextPage = () => {
                 }}
                 placeholder="Talk to your larva..."
                 rows={1}
+                maxLength={CHAT_MAX_LENGTH}
                 className="textarea textarea-bordered rounded-none flex-1 resize-none"
                 style={{ minHeight: "2.75rem", maxHeight: "10rem", overflowY: "auto" }}
               />
-              <button onClick={sendMessage} disabled={loading || !input.trim()} className="btn btn-primary">
+              <button onClick={sendMessage} disabled={loading || !input.trim() || input.length > CHAT_MAX_LENGTH} className="btn btn-primary">
                 Send
               </button>
             </div>
           )}
           {hasEnoughToSend && (
-            <p className="text-xs text-base-content/30 text-right mt-1">costs 10K CV · need 1M to send again</p>
+            <div className="flex justify-between items-center mt-1">
+              <p className="text-xs text-base-content/30">costs 10K CV · need 1M to send again</p>
+              {input.length > 0 && (
+                <span className={`text-xs tabular-nums ${input.length >= CHAT_MAX_LENGTH ? "text-error" : input.length >= CHAT_MAX_LENGTH * 0.85 ? "text-warning" : "text-base-content/30"}`}>
+                  {input.length} / {CHAT_MAX_LENGTH}
+                </span>
+              )}
+            </div>
           )}
         </div>
       </div>

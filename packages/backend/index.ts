@@ -10,6 +10,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// --- Char limits (mirror packages/nextjs/lib/questions.ts) ---
+const CHAT_MAX_LENGTH = 500;
+const MAX_LENGTH_MAIN = 500;
+const MAX_LENGTH_NOTES = 300;
+
 // --- Config ---
 const PORT = 3001;
 const RPC_URL = "http://127.0.0.1:8545";
@@ -311,6 +316,17 @@ app.post("/api/onboard/:wallet", async (req, res) => {
   const { answers } = req.body;
   if (!answers) return res.status(400).json({ error: "answers required" });
 
+  // Validate answer lengths
+  if (typeof answers === "object") {
+    for (const [key, val] of Object.entries(answers)) {
+      if (typeof val !== "string") continue;
+      const limit = key.endsWith("_notes") ? MAX_LENGTH_NOTES : MAX_LENGTH_MAIN;
+      if (val.length > limit) {
+        return res.status(400).json({ error: `Answer too long (max ${limit} characters for "${key}")` });
+      }
+    }
+  }
+
   // Generate identity brief via Sonnet (one-time, high stakes)
   let identity_brief = null;
   try {
@@ -384,6 +400,9 @@ app.post("/api/chat", async (req, res) => {
   const { wallet, message } = req.body;
   if (!wallet || !message) {
     return res.status(400).json({ error: "wallet and message required" });
+  }
+  if (typeof message !== "string" || message.length > CHAT_MAX_LENGTH) {
+    return res.status(400).json({ error: `Message too long (max ${CHAT_MAX_LENGTH} characters)` });
   }
 
   const w = wallet.toLowerCase();
