@@ -19,6 +19,7 @@ interface ProposalData {
     created_at: string;
     status: string;
     aggregated_opinion?: string | null;
+    aggregated_opinion_short?: string | null;
   };
   responseCount: number;
   pendingCount: number;
@@ -344,7 +345,14 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
                 )}
               </div>
               {proposal.aggregated_opinion ? (
-                <p className="whitespace-pre-wrap text-base-content">{proposal.aggregated_opinion}</p>
+                <>
+                  <p className="whitespace-pre-wrap text-base-content">{proposal.aggregated_opinion}</p>
+                  {proposal.aggregated_opinion_short && (
+                    <div className="mt-4 pt-4 border-t border-base-content/10">
+                      <p className="text-lg font-semibold text-error">{proposal.aggregated_opinion_short}</p>
+                    </div>
+                  )}
+                </>
               ) : (
                 <p className="text-base-content/50 text-sm">
                   No ruling yet. Hit the button to synthesize all responses.

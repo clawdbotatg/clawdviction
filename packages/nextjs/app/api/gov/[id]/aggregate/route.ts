@@ -76,13 +76,39 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const opinion = data.content?.[0]?.text;
     if (!opinion) return NextResponse.json({ error: "No response from model" }, { status: 500 });
 
+    // Third pass: one-line summary
+    await sql`ALTER TABLE governance_proposals ADD COLUMN IF NOT EXISTS aggregated_opinion_short TEXT`;
+
+    const shortRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-5",
+        max_tokens: 100,
+        messages: [
+          {
+            role: "user",
+            content: `Here is a governance analysis:\n\n${opinion}\n\nGive me a single one-line answer that captures the bottom line. No preamble, no punctuation at the end, just the line.`,
+          },
+        ],
+      }),
+    });
+
+    const shortData = await shortRes.json();
+    const opinionShort = shortData.content?.[0]?.text?.trim() ?? null;
+
     // Store on the proposal
     await sql`
       UPDATE governance_proposals
-      SET aggregated_opinion = ${opinion}
+      SET aggregated_opinion = ${opinion},
+          aggregated_opinion_short = ${opinionShort}
       WHERE id = ${id}`;
 
-    return NextResponse.json({ opinion });
+    return NextResponse.json({ opinion, opinionShort });
   } catch (error) {
     console.error("POST /api/gov/[id]/aggregate error:", error);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
