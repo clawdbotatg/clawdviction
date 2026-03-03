@@ -354,7 +354,7 @@ export async function POST(request: NextRequest) {
         headers: apiHeaders,
         body: JSON.stringify({
           model: "claude-haiku-4-5",
-          max_tokens: round === 0 ? 200 : 400,
+          max_tokens: 600,
           system: systemPrompt,
           messages: currentMessages,
           tools: ANTHROPIC_TOOLS,
@@ -395,7 +395,18 @@ export async function POST(request: NextRequest) {
       // Extract final text
       if (Array.isArray(data.content)) {
         const textBlock = data.content.find((b: { type: string }) => b.type === "text");
-        if (textBlock) assistantMessage = textBlock.text;
+        if (textBlock) {
+          assistantMessage = textBlock.text;
+        } else if (data.stop_reason === "max_tokens") {
+          console.error(
+            "Larva hit max_tokens with no text block — round",
+            round,
+            JSON.stringify(data.content).slice(0, 300),
+          );
+          assistantMessage = "🦞 *clicks claws nervously* — try again?";
+        } else {
+          console.error("Unexpected Anthropic response shape:", JSON.stringify(data).slice(0, 500));
+        }
       } else {
         console.error("Unexpected Anthropic response shape:", JSON.stringify(data).slice(0, 500));
       }
