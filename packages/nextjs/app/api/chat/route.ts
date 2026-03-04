@@ -374,7 +374,7 @@ export async function POST(request: NextRequest) {
         method: "POST",
         headers: apiHeaders,
         body: JSON.stringify({
-          model: "zai-org-glm-4.7",
+          model: "zai-org-glm-5",
           max_tokens: 600,
           messages: [{ role: "system", content: systemPrompt }, ...currentMessages],
           tools: VENICE_TOOLS,
