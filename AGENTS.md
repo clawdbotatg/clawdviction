@@ -2,6 +2,25 @@
 
 This file provides guidance to coding agents working in this repository.
 
+## ⚠️ DEPLOYMENT — READ THIS FIRST
+
+**ClawdViction deploys to the BuidlGuidl DAO Vercel account, NOT clawdbotatg's personal account.**
+
+- **Production URL:** `https://clawdviction.vercel.app`
+- **Vercel team:** `buidlguidldao` (teamId: `team_CGnKjJxxZopM4R0pQR8RsBSP`)
+- **Vercel project:** `clawdviction` (projectId: `prj_Fov9vI9JKInQDviTGdxg0xjOnuPX`)
+- **Deploy method:** Push to `main` branch → GitHub auto-triggers Vercel deploy. **Do NOT use Vercel CLI.**
+- **Wrong project:** `prj_FasE5ieSoP6Ah9go4NkJ1utO7wHe` is a different project — ignore it.
+
+## AI / LLM
+
+- All AI routes use **Venice AI** (OpenAI-compatible) — NOT Anthropic directly
+- Model: `zai-org-glm-5`
+- Env var: `VENICE_API_KEY` (value starts with `VENICE_INFERENCE_KEY_...`)
+- Base URL: `https://api.venice.ai/api/v1`
+- Always set `venice_parameters: { include_venice_system_prompt: false, strip_thinking_response: true }`
+- GLM 5 uses chain-of-thought reasoning — `strip_thinking_response: true` is required or content will be empty
+
 ## Project Overview
 
 Scaffold-ETH 2 (SE-2) is a starter kit for building dApps on Ethereum. It comes in **two flavors** based on the Solidity framework:
