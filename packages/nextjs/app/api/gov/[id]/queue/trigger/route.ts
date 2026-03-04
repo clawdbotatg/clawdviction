@@ -28,7 +28,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       // Re-queue all wallets that already responded so we can regenerate their response
       await sql`
         UPDATE governance_queue SET status = 'pending', processed_at = NULL
-        WHERE proposal_id = ${id} AND status = 'done'`;
+        WHERE proposal_id = ${id} AND status IN ('done', 'failed')`;
+
+      // Also add any onboarded wallets that are NOT yet in the queue at all
+      await sql`
+        INSERT INTO governance_queue (proposal_id, wallet, status)
+        SELECT ${id}, ls.wallet, 'pending'
+        FROM larva_seeds ls
+        WHERE ls.completed = true
+          AND NOT EXISTS (
+            SELECT 1 FROM governance_queue gq
+            WHERE gq.proposal_id = ${id} AND LOWER(gq.wallet) = LOWER(ls.wallet)
+          )
+        ON CONFLICT DO NOTHING`;
     }
 
     const pending = await sql`

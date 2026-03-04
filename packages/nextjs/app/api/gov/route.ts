@@ -41,8 +41,8 @@ export async function POST(request: NextRequest) {
 
     const proposal = result.rows[0];
 
-    // Queue all wallets with CV balances
-    const wallets = await sql`SELECT wallet FROM clawdviction_balances`;
+    // Queue all wallets that have completed onboarding (have a larva with context)
+    const wallets = await sql`SELECT wallet FROM larva_seeds WHERE completed = true`;
     for (const row of wallets.rows) {
       await sql`
         INSERT INTO governance_queue (proposal_id, wallet)
