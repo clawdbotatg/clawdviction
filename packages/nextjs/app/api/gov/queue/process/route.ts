@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.VENICE_API_KEY;
     if (!apiKey) return NextResponse.json({ error: "No API key" }, { status: 500 });
 
     await initDb();

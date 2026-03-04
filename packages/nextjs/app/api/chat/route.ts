@@ -92,34 +92,47 @@ async function getClawdPriceUsd(): Promise<{ priceUsd: number; priceEth: number;
   }
 }
 
-const ANTHROPIC_TOOLS = [
+// OpenAI-compatible tools format (works with Venice AI)
+const VENICE_TOOLS = [
   {
-    name: "get_clawd_token_stats",
-    description: "Fetch live CLAWD token data including price (if available) and total staked CLAWD from on-chain.",
-    input_schema: { type: "object" as const, properties: {}, required: [] as string[] },
-  },
-  {
-    name: "get_wallet_cv_score",
-    description: "Look up a wallet's ClawdViction score, accrual rate, and balance.",
-    input_schema: {
-      type: "object" as const,
-      properties: { wallet: { type: "string", description: "Ethereum address" } },
-      required: ["wallet"],
+    type: "function" as const,
+    function: {
+      name: "get_clawd_token_stats",
+      description: "Fetch live CLAWD token data including price (if available) and total staked CLAWD from on-chain.",
+      parameters: { type: "object", properties: {}, required: [] as string[] },
     },
   },
   {
-    name: "get_ecosystem_stats",
-    description: "Get a snapshot of the CLAWD ecosystem: total staked, number of CV wallets, and other stats.",
-    input_schema: { type: "object" as const, properties: {}, required: [] as string[] },
+    type: "function" as const,
+    function: {
+      name: "get_wallet_cv_score",
+      description: "Look up a wallet's ClawdViction score, accrual rate, and balance.",
+      parameters: {
+        type: "object",
+        properties: { wallet: { type: "string", description: "Ethereum address" } },
+        required: ["wallet"],
+      },
+    },
   },
   {
-    name: "fetch_url",
-    description:
-      "Fetch and read the content of a URL. Use this to look up live info from CLAWD ecosystem sites or any relevant URL. Returns page text content.",
-    input_schema: {
-      type: "object" as const,
-      properties: { url: { type: "string", description: "The URL to fetch" } },
-      required: ["url"],
+    type: "function" as const,
+    function: {
+      name: "get_ecosystem_stats",
+      description: "Get a snapshot of the CLAWD ecosystem: total staked, number of CV wallets, and other stats.",
+      parameters: { type: "object", properties: {}, required: [] as string[] },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "fetch_url",
+      description:
+        "Fetch and read the content of a URL. Use this to look up live info from CLAWD ecosystem sites or any relevant URL. Returns page text content.",
+      parameters: {
+        type: "object",
+        properties: { url: { type: "string", description: "The URL to fetch" } },
+        required: ["url"],
+      },
     },
   },
 ];
@@ -250,7 +263,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.VENICE_API_KEY;
+    const baseUrl = process.env.VENICE_BASE_URL || "https://api.venice.ai/api/v1";
     if (!apiKey) {
       return NextResponse.json({ error: "API key not configured" }, { status: 500 });
     }
@@ -337,78 +351,79 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Anthropic API call with tool use support
+    // Venice AI API call (OpenAI-compatible) with tool use support
     const apiHeaders = {
       "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
+      Authorization: `Bearer ${apiKey}`,
     };
 
-    const currentMessages = [...history];
+    // Convert history to OpenAI message format (system prompt separate)
+    const openaiHistory = history.map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
+    const currentMessages: {
+      role: string;
+      content: string | null;
+      tool_calls?: unknown;
+      tool_call_id?: string;
+      name?: string;
+    }[] = [...openaiHistory];
     let assistantMessage = "🦞 *confused clicking*";
 
     // Tool use loop (max 3 rounds to prevent runaway)
     for (let round = 0; round < 3; round++) {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await fetch(`${baseUrl}/chat/completions`, {
         method: "POST",
         headers: apiHeaders,
         body: JSON.stringify({
-          model: "claude-haiku-4-5",
+          model: "zai-org-glm-4.7",
           max_tokens: 600,
-          system: systemPrompt,
-          messages: currentMessages,
-          tools: ANTHROPIC_TOOLS,
+          messages: [{ role: "system", content: systemPrompt }, ...currentMessages],
+          tools: VENICE_TOOLS,
+          venice_parameters: { include_venice_system_prompt: false },
         }),
       });
 
       const data = await response.json();
 
-      // Handle API errors (overload, auth failure, invalid model, etc.)
-      if (!response.ok || data.type === "error") {
+      // Handle API errors
+      if (!response.ok || data.error) {
         const errMsg = data?.error?.message ?? `HTTP ${response.status}`;
-        console.error("Anthropic API error:", response.status, JSON.stringify(data));
-        if (response.status === 529 || data?.error?.type === "overloaded_error") {
-          assistantMessage = "🦞 Sorry, I'm overloaded right now — try again in a moment.";
-        } else {
-          assistantMessage = `🦞 Something went wrong on my end (${response.status}). Try again soon.`;
-        }
+        console.error("Venice API error:", response.status, JSON.stringify(data));
+        assistantMessage = `🦞 Something went wrong on my end (${response.status}). Try again soon.`;
         console.error("Larva API error detail:", errMsg);
         break;
       }
 
-      if (data.stop_reason === "tool_use") {
-        // Add assistant message with tool_use blocks
-        currentMessages.push({ role: "assistant", content: data.content });
+      const choice = data.choices?.[0];
+      const msg = choice?.message;
 
-        // Execute each tool call and build tool_result blocks
-        const toolResults: { type: "tool_result"; tool_use_id: string; content: string }[] = [];
-        for (const block of data.content) {
-          if (block.type === "tool_use") {
-            const result = await executeToolCall(block.name, block.input as Record<string, unknown>);
-            toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
+      if (choice?.finish_reason === "tool_calls" && msg?.tool_calls?.length) {
+        // Add assistant message with tool_calls
+        currentMessages.push({ role: "assistant", content: msg.content ?? null, tool_calls: msg.tool_calls });
+
+        // Execute each tool call and push tool results
+        for (const tc of msg.tool_calls) {
+          if (tc.type === "function") {
+            let toolInput: Record<string, unknown> = {};
+            try {
+              toolInput = JSON.parse(tc.function.arguments || "{}");
+            } catch {
+              /* ignore */
+            }
+            const result = await executeToolCall(tc.function.name, toolInput);
+            currentMessages.push({ role: "tool", tool_call_id: tc.id, name: tc.function.name, content: result });
           }
         }
-        currentMessages.push({ role: "user", content: toolResults as unknown as string });
         continue;
       }
 
       // Extract final text
-      if (Array.isArray(data.content)) {
-        const textBlock = data.content.find((b: { type: string }) => b.type === "text");
-        if (textBlock) {
-          assistantMessage = textBlock.text;
-        } else if (data.stop_reason === "max_tokens") {
-          console.error(
-            "Larva hit max_tokens with no text block — round",
-            round,
-            JSON.stringify(data.content).slice(0, 300),
-          );
-          assistantMessage = "🦞 *clicks claws nervously* — try again?";
-        } else {
-          console.error("Unexpected Anthropic response shape:", JSON.stringify(data).slice(0, 500));
-        }
+      if (msg?.content) {
+        assistantMessage = msg.content;
+      } else if (choice?.finish_reason === "length") {
+        console.error("Larva hit max_tokens — round", round);
+        assistantMessage = "🦞 *clicks claws nervously* — try again?";
       } else {
-        console.error("Unexpected Anthropic response shape:", JSON.stringify(data).slice(0, 500));
+        console.error("Unexpected Venice response shape:", JSON.stringify(data).slice(0, 500));
       }
       break;
     }

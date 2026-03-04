@@ -80,23 +80,26 @@ export async function processQueueItem(item: QueueItem, apiKey: string): Promise
       ? `GOVERNANCE VOTE: "${item.title}"\n\nQuestion: ${item.question}\n\nBased on everything you know about this holder's values and preferences, respond with ONLY "yes", "no", or "abstain" on the first line, then explain your reasoning on the following lines.`
       : `GOVERNANCE RFC: "${item.title}"\n\nQuestion: ${item.question}\n\nBased on everything you know about this holder's values and preferences, provide a thoughtful comment representing their perspective. Keep it to 2-4 sentences.`;
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const baseUrl = process.env.VENICE_BASE_URL || "https://api.venice.ai/api/v1";
+  const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "claude-haiku-4-5",
+      model: "zai-org-glm-4.7",
       max_tokens: 400,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userMessage }],
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
+      ],
+      venice_parameters: { include_venice_system_prompt: false },
     }),
   });
 
   const data = await response.json();
-  const text = data.content?.[0]?.text || "";
+  const text = data.choices?.[0]?.message?.content || "";
 
   let responseText = text;
   let reasoning: string | null = null;

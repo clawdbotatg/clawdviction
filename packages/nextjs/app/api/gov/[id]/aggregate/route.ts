@@ -15,7 +15,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const id = parseInt(idStr);
     if (isNaN(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.VENICE_API_KEY;
+    const baseUrl = process.env.VENICE_BASE_URL || "https://api.venice.ai/api/v1";
     if (!apiKey) return NextResponse.json({ error: "No API key" }, { status: 500 });
 
     await initDb();
@@ -58,36 +59,35 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const userPrompt = `Proposal: "${proposal.title}"\nQuestion: ${proposal.question}\n\nResponses (sorted by CV weight, highest first):\n\n${formatted}\n\n${proposal.type === "vote" ? "Form a ruling based on these votes." : "Form an aggregated community opinion from these comments."}`;
 
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-5",
+        model: "zai-org-glm-4.7",
         max_tokens: 800,
         messages: [{ role: "user", content: systemPrompt + "\n\n" + userPrompt }],
+        venice_parameters: { include_venice_system_prompt: false },
       }),
     });
 
     const data = await res.json();
-    const opinion = data.content?.[0]?.text;
+    const opinion = data.choices?.[0]?.message?.content;
     if (!opinion) return NextResponse.json({ error: "No response from model" }, { status: 500 });
 
     // Third pass: one-line summary
     await sql`ALTER TABLE governance_proposals ADD COLUMN IF NOT EXISTS aggregated_opinion_short TEXT`;
 
-    const shortRes = await fetch("https://api.anthropic.com/v1/messages", {
+    const shortRes = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-5",
+        model: "zai-org-glm-4.7",
         max_tokens: 100,
         messages: [
           {
@@ -95,11 +95,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             content: `Here is a governance analysis:\n\n${opinion}\n\nGive me a single one-line answer that captures the bottom line. No preamble, no punctuation at the end, just the line.`,
           },
         ],
+        venice_parameters: { include_venice_system_prompt: false },
       }),
     });
 
     const shortData = await shortRes.json();
-    const opinionShort = shortData.content?.[0]?.text?.trim() ?? null;
+    const opinionShort = shortData.choices?.[0]?.message?.content?.trim() ?? null;
 
     // Store on the proposal
     await sql`

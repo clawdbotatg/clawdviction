@@ -16,7 +16,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const id = parseInt(idStr);
     if (isNaN(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.VENICE_API_KEY;
     if (!apiKey) return NextResponse.json({ error: "No API key" }, { status: 500 });
 
     await initDb();
