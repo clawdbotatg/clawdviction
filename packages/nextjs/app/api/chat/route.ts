@@ -375,7 +375,7 @@ export async function POST(request: NextRequest) {
         headers: apiHeaders,
         body: JSON.stringify({
           model: "zai-org-glm-5",
-          max_tokens: 1200,
+          max_tokens: 2000,
           messages: [{ role: "system", content: systemPrompt }, ...currentMessages],
           tools: VENICE_TOOLS,
           venice_parameters: { include_venice_system_prompt: false, strip_thinking_response: true },
@@ -419,8 +419,12 @@ export async function POST(request: NextRequest) {
       // Extract final text
       if (msg?.content) {
         assistantMessage = msg.content;
+      } else if (choice?.finish_reason === "length" && msg?.content) {
+        // Truncated but has content — use it, just log the warning
+        console.error("Larva hit max_tokens — round", round, "(truncated but has content)");
+        assistantMessage = msg.content;
       } else if (choice?.finish_reason === "length") {
-        console.error("Larva hit max_tokens — round", round);
+        console.error("Larva hit max_tokens with no content — round", round);
         assistantMessage = "🦞 *clicks claws nervously* — try again?";
       } else {
         console.error("Unexpected Venice response shape:", JSON.stringify(data).slice(0, 500));
