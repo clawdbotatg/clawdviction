@@ -69,7 +69,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         model: "zai-org-glm-5",
         max_tokens: 800,
         messages: [{ role: "user", content: systemPrompt + "\n\n" + userPrompt }],
-        venice_parameters: { include_venice_system_prompt: false },
+        venice_parameters: { include_venice_system_prompt: false, strip_thinking_response: true },
       }),
     });
 
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             content: `Here is a governance analysis:\n\n${opinion}\n\nGive me a single one-line answer that captures the bottom line. No preamble, no punctuation at the end, just the line.`,
           },
         ],
-        venice_parameters: { include_venice_system_prompt: false },
+        venice_parameters: { include_venice_system_prompt: false, strip_thinking_response: true },
       }),
     });
 

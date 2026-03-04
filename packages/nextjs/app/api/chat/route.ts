@@ -375,10 +375,10 @@ export async function POST(request: NextRequest) {
         headers: apiHeaders,
         body: JSON.stringify({
           model: "zai-org-glm-5",
-          max_tokens: 600,
+          max_tokens: 1200,
           messages: [{ role: "system", content: systemPrompt }, ...currentMessages],
           tools: VENICE_TOOLS,
-          venice_parameters: { include_venice_system_prompt: false },
+          venice_parameters: { include_venice_system_prompt: false, strip_thinking_response: true },
         }),
       });
 

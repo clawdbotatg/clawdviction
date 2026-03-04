@@ -94,7 +94,7 @@ export async function processQueueItem(item: QueueItem, apiKey: string): Promise
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
       ],
-      venice_parameters: { include_venice_system_prompt: false },
+      venice_parameters: { include_venice_system_prompt: false, strip_thinking_response: true },
     }),
   });
 

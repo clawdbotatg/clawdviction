@@ -56,12 +56,12 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         model: "zai-org-glm-5",
-        max_tokens: 500,
+        max_tokens: 800,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: "Please greet the holder." },
         ],
-        venice_parameters: { include_venice_system_prompt: false },
+        venice_parameters: { include_venice_system_prompt: false, strip_thinking_response: true },
       }),
     });
 
