@@ -95,6 +95,12 @@ export async function initDb() {
       UNIQUE(proposal_id, wallet)
     )`;
 
+  // Migrations — run once at init, not on every request
+  await sql`ALTER TABLE governance_responses ADD COLUMN IF NOT EXISTS human_override TEXT`;
+  await sql`ALTER TABLE governance_responses ADD COLUMN IF NOT EXISTS human_note TEXT`;
+  await sql`ALTER TABLE governance_proposals ADD COLUMN IF NOT EXISTS aggregated_opinion TEXT`;
+  await sql`ALTER TABLE governance_proposals ADD COLUMN IF NOT EXISTS aggregated_opinion_short TEXT`;
+
   dbInitialized = true;
 }
 

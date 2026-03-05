@@ -8,11 +8,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     await initDb();
 
-    // Migrations
-    await sql`ALTER TABLE governance_responses ADD COLUMN IF NOT EXISTS human_override TEXT`;
-    await sql`ALTER TABLE governance_responses ADD COLUMN IF NOT EXISTS human_note TEXT`;
-    await sql`ALTER TABLE governance_proposals ADD COLUMN IF NOT EXISTS aggregated_opinion TEXT`;
-
     const { id: idStr } = await params;
     const id = parseInt(idStr);
     if (isNaN(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });

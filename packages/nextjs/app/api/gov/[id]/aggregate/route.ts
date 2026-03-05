@@ -21,9 +21,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     await initDb();
 
-    // Migration
-    await sql`ALTER TABLE governance_proposals ADD COLUMN IF NOT EXISTS aggregated_opinion TEXT`;
-
     // Fetch proposal
     const propResult = await sql`SELECT * FROM governance_proposals WHERE id = ${id}`;
     if (propResult.rows.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -78,8 +75,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!opinion) return NextResponse.json({ error: "No response from model" }, { status: 500 });
 
     // Third pass: one-line summary
-    await sql`ALTER TABLE governance_proposals ADD COLUMN IF NOT EXISTS aggregated_opinion_short TEXT`;
-
     const shortRes = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: {

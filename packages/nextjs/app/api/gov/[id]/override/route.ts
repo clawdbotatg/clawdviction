@@ -6,9 +6,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     await initDb();
 
-    // Migration
-    await sql`ALTER TABLE governance_responses ADD COLUMN IF NOT EXISTS human_override TEXT`;
-
     const wallet = await verifyAuth(request);
     if (!wallet) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
