@@ -355,25 +355,41 @@ export async function POST(request: NextRequest) {
         ? `\n\nThis holder completed their onboarding interview. Below are their exact answers — treat these as the foundation of your understanding of who they are:\n\n${onboardingContext}`
         : "");
 
-    // Gate: check CV balance BEFORE calling Haiku — don't burn an API call if they can't afford it
+    // Gate + atomic deduction BEFORE calling Venice — prevents race condition exploits.
+    // Materializes pending accrual then does a single atomic UPDATE that only succeeds
+    // if the resulting balance stays >= 0. If no rows updated → insufficient CV.
+    const DIVISOR = 1_728_000n * 1_000_000_000_000_000_000n;
+    const CHAT_COST = 10_000n;
+    const SEND_THRESHOLD = 1_000_000n;
+
     if (dbOk) {
-      const DIVISOR_PRE = 1_728_000n * 1_000_000_000_000_000_000n;
-      const SEND_THRESHOLD_PRE = 1_000_000n;
       try {
-        const cvPre =
-          await sql`SELECT balance, accrual_rate, last_accrued_at FROM clawdviction_balances WHERE wallet = ${wallet.toLowerCase()}`;
-        if (cvPre.rows.length > 0) {
-          const r = cvPre.rows[0];
-          const elapsed =
-            BigInt(Math.floor(Date.now() / 1000)) - BigInt(Math.floor(new Date(r.last_accrued_at).getTime() / 1000));
-          const materialized =
-            BigInt(r.balance) + (BigInt(r.accrual_rate) * (elapsed > 0n ? elapsed : 0n)) / DIVISOR_PRE;
-          if (materialized < SEND_THRESHOLD_PRE) {
-            return NextResponse.json({ error: "Insufficient CV — need 1M to chat" }, { status: 402 });
-          }
+        // Materialize pending accrual + deduct atomically in one statement.
+        // The WHERE clause ensures we only update if materialized balance >= SEND_THRESHOLD.
+        const deducted = await sql`
+          UPDATE clawdviction_balances
+          SET
+            balance = balance
+              + (accrual_rate * EXTRACT(EPOCH FROM (NOW() - last_accrued_at))::bigint) / ${DIVISOR.toString()}::numeric
+              - ${CHAT_COST.toString()}::numeric,
+            total_spent = total_spent + ${CHAT_COST.toString()}::numeric,
+            total_earned = total_earned
+              + (accrual_rate * EXTRACT(EPOCH FROM (NOW() - last_accrued_at))::bigint) / ${DIVISOR.toString()}::numeric,
+            last_accrued_at = NOW()
+          WHERE wallet = ${wallet.toLowerCase()}
+            AND (
+              balance
+              + (accrual_rate * GREATEST(EXTRACT(EPOCH FROM (NOW() - last_accrued_at))::bigint, 0)) / ${DIVISOR.toString()}::numeric
+            ) >= ${SEND_THRESHOLD.toString()}::numeric
+          RETURNING balance`;
+
+        if (deducted.rows.length === 0) {
+          // Either wallet not found or insufficient CV — either way, reject
+          return NextResponse.json({ error: "Insufficient CV — need 1M to chat" }, { status: 402 });
         }
       } catch (e) {
-        console.error("CV pre-check error:", e);
+        console.error("CV atomic deduction error:", e);
+        // Fail open only if DB is genuinely broken — log and continue
       }
     }
 
@@ -462,37 +478,6 @@ export async function POST(request: NextRequest) {
       // Save assistant reply
       await sql`
         INSERT INTO chat_messages (wallet, role, content) VALUES (${wallet}, 'assistant', ${assistantMessage})`;
-
-      // ClawdViction gate + deduction
-      // Must have >= 1M CV to send; deducts 10K after a successful message
-      const DIVISOR = 1_728_000n * 1_000_000_000_000_000_000n;
-      const CHAT_COST = 10_000n;
-      try {
-        const cvRow = await sql`SELECT * FROM clawdviction_balances WHERE wallet = ${wallet.toLowerCase()}`;
-        if (cvRow.rows.length > 0) {
-          const row = cvRow.rows[0];
-          const balance = BigInt(row.balance);
-          const accrualRate = BigInt(row.accrual_rate);
-          const lastAccrued = BigInt(Math.floor(new Date(row.last_accrued_at).getTime() / 1000));
-          const nowSec = BigInt(Math.floor(Date.now() / 1000));
-          const elapsed = nowSec - lastAccrued > 0n ? nowSec - lastAccrued : 0n;
-          const pending = (accrualRate * elapsed) / DIVISOR;
-          const materialized = balance + pending;
-
-          const newBalance = materialized - CHAT_COST;
-          const newTotalEarned = BigInt(row.total_earned) + pending;
-          const newTotalSpent = BigInt(row.total_spent) + CHAT_COST;
-          await sql`
-            UPDATE clawdviction_balances SET
-              balance = ${newBalance.toString()}::numeric,
-              last_accrued_at = NOW(),
-              total_earned = ${newTotalEarned.toString()}::numeric,
-              total_spent = ${newTotalSpent.toString()}::numeric
-            WHERE wallet = ${wallet.toLowerCase()}`;
-        }
-      } catch (e) {
-        console.error("ClawdViction deduction error:", e);
-      }
 
       // Fire-and-forget memory compression check
       const countResult = await sql`SELECT COUNT(*) as cnt FROM chat_messages WHERE wallet = ${wallet}`;
