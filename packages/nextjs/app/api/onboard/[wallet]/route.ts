@@ -4,12 +4,12 @@ import { MAX_LENGTH_MAIN, MAX_LENGTH_NOTES } from "~~/lib/questions";
 import { verifyAuth } from "~~/lib/verifyAuth";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ wallet: string }> }) {
-  const { wallet } = await params;
+  const { wallet: rawWallet } = await params;
+  const wallet = rawWallet.toLowerCase();
   const verified = await verifyAuth(request);
-  if (!verified || verified !== wallet.toLowerCase()) {
+  if (!verified || verified !== wallet) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  // ⚠️ wallet is stored mixed-case (checksummed) in DB — never use lower() when querying or deleting
 
   await initDb();
   if (!(await isDbAvailable())) {
@@ -37,9 +37,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ wallet: string }> }) {
   try {
-    const { wallet } = await params;
+    const { wallet: rawWallet } = await params;
+    const wallet = rawWallet.toLowerCase();
     const verified = await verifyAuth(request);
-    if (!verified || verified !== wallet.toLowerCase()) {
+    if (!verified || verified !== wallet) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const { answers } = await request.json();
@@ -51,7 +52,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         if (typeof val !== "string") continue;
         const limit = key.endsWith("_notes") ? MAX_LENGTH_NOTES : MAX_LENGTH_MAIN;
         if (val.length > limit) {
-          return NextResponse.json({ error: `Answer too long (max ${limit} characters for "${key}")` }, { status: 400 });
+          return NextResponse.json(
+            { error: `Answer too long (max ${limit} characters for "${key}")` },
+            { status: 400 },
+          );
         }
       }
     }

@@ -44,9 +44,10 @@ export async function POST(request: NextRequest) {
     // Queue all wallets that have completed onboarding (have a larva with context)
     const wallets = await sql`SELECT wallet FROM larva_seeds WHERE completed = true`;
     for (const row of wallets.rows) {
+      const w = row.wallet.toLowerCase();
       await sql`
         INSERT INTO governance_queue (proposal_id, wallet)
-        VALUES (${proposal.id}, ${row.wallet})
+        VALUES (${proposal.id}, ${w})
         ON CONFLICT DO NOTHING`;
     }
 

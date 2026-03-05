@@ -11,10 +11,12 @@ export async function POST(request: NextRequest) {
     const verified = await verifyAuth(request);
     if (!verified) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { wallet } = await request.json();
-    if (!wallet) return NextResponse.json({ error: "Missing wallet" }, { status: 400 });
+    const { wallet: rawWallet } = await request.json();
+    if (!rawWallet) return NextResponse.json({ error: "Missing wallet" }, { status: 400 });
 
-    if (verified !== wallet.toLowerCase()) {
+    const wallet = rawWallet.toLowerCase();
+
+    if (verified !== wallet) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

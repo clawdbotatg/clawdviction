@@ -20,6 +20,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!note || typeof note !== "string") {
       return NextResponse.json({ error: "Missing note" }, { status: 400 });
     }
+    if (note.length > 1000) {
+      return NextResponse.json({ error: "Note too long (max 1000 characters)" }, { status: 400 });
+    }
 
     // Verify proposal is rfc type
     const proposal = await sql`SELECT type FROM governance_proposals WHERE id = ${id}`;

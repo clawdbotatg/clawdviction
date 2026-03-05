@@ -275,17 +275,19 @@ export async function POST(request: NextRequest) {
     const verified = await verifyAuth(request);
     if (!verified) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { wallet, message, messages: clientMessages } = await request.json();
+    const { wallet: rawWallet, message, messages: clientMessages } = await request.json();
 
-    if (!wallet || !message) {
+    if (!rawWallet || !message) {
       return NextResponse.json({ error: "Missing wallet or message" }, { status: 400 });
     }
+
+    const wallet = rawWallet.toLowerCase();
 
     if (typeof message !== "string" || message.length > CHAT_MAX_LENGTH) {
       return NextResponse.json({ error: `Message too long (max ${CHAT_MAX_LENGTH} characters)` }, { status: 400 });
     }
 
-    if (verified !== wallet.toLowerCase()) {
+    if (verified !== wallet) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
