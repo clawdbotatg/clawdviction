@@ -343,10 +343,6 @@ export async function POST(request: NextRequest) {
         /* ignore */
       }
 
-      // Save user message to DB
-      await sql`
-        INSERT INTO chat_messages (wallet, role, content) VALUES (${wallet}, 'user', ${message})`;
-
       // Check for memory snapshot
       const snapshotResult = await sql`SELECT snapshot FROM memory_snapshots WHERE wallet = ${wallet}`;
       const snapshot = snapshotResult.rows[0]?.snapshot;
@@ -416,6 +412,11 @@ export async function POST(request: NextRequest) {
         if (deducted.rows.length === 0) {
           // Either wallet not found or insufficient CV — either way, reject
           return NextResponse.json({ error: "Insufficient CV — need 1M to chat" }, { status: 402 });
+        }
+
+        // CV deducted — now safe to save the user message
+        if (dbOk) {
+          await sql`INSERT INTO chat_messages (wallet, role, content) VALUES (${wallet}, 'user', ${message})`;
         }
       } catch (e) {
         console.error("CV atomic deduction error:", e);
