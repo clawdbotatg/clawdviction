@@ -59,8 +59,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       const result = await sql`SELECT * FROM clawdviction_balances WHERE wallet = ${walletLower}`;
       if (result.rows.length > 0) {
         const row = result.rows[0];
-        const balance = BigInt(row.balance);
-        const accrualRate = BigInt(row.accrual_rate);
+        const balance = BigInt(Math.floor(Number(row.balance)));
+        const accrualRate = BigInt(Math.floor(Number(row.accrual_rate)));
         const lastAccruedAt = new Date(row.last_accrued_at);
         const elapsed = nowUnix - BigInt(Math.floor(lastAccruedAt.getTime() / 1000));
         const pending = (accrualRate * (elapsed > 0n ? elapsed : 0n)) / DIVISOR;
