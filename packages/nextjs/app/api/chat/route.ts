@@ -221,6 +221,32 @@ async function executeToolCall(name: string, input: Record<string, unknown>): Pr
     if (name === "fetch_url") {
       const url = input.url as string;
       if (!url) return JSON.stringify({ error: "missing url" });
+
+      // SSRF protection — block private IPs, localhost, link-local
+      let parsed: URL;
+      try {
+        parsed = new URL(url);
+      } catch {
+        return JSON.stringify({ error: "invalid url" });
+      }
+      if (!["http:", "https:"].includes(parsed.protocol)) {
+        return JSON.stringify({ error: "invalid protocol" });
+      }
+      const hostname = parsed.hostname;
+      const blocked =
+        hostname === "localhost" ||
+        /^127\./.test(hostname) ||
+        /^10\./.test(hostname) ||
+        /^192\.168\./.test(hostname) ||
+        /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+        /^169\.254\./.test(hostname) ||
+        /^::1$/.test(hostname) ||
+        /^fc00:/i.test(hostname) ||
+        /^fe80:/i.test(hostname);
+      if (blocked) {
+        return JSON.stringify({ error: "private URLs not allowed" });
+      }
+
       const res = await fetch(url, {
         signal: AbortSignal.timeout(10000),
         headers: { "User-Agent": "ClawdViction-Larva/1.0 (+https://clawdbotatg.eth.link)" },
