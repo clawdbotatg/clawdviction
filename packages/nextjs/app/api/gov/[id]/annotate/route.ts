@@ -30,12 +30,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (proposal.rows[0].type !== "rfc") return NextResponse.json({ error: "Not an RFC proposal" }, { status: 400 });
 
     // Check user has a response
-    const existing = await sql`SELECT id FROM governance_responses WHERE proposal_id = ${id} AND wallet = ${wallet}`;
+    const existing =
+      await sql`SELECT id FROM governance_responses WHERE proposal_id = ${id} AND LOWER(wallet) = ${wallet}`;
     if (existing.rows.length === 0) {
       return NextResponse.json({ error: "No larva response to annotate" }, { status: 400 });
     }
 
-    await sql`UPDATE governance_responses SET human_note = ${note} WHERE proposal_id = ${id} AND wallet = ${wallet}`;
+    await sql`UPDATE governance_responses SET human_note = ${note} WHERE proposal_id = ${id} AND LOWER(wallet) = ${wallet}`;
 
     return NextResponse.json({ ok: true });
   } catch (error) {

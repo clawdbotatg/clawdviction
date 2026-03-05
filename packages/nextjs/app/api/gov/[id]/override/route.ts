@@ -27,19 +27,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (proposal.rows[0].type !== "vote") return NextResponse.json({ error: "Not a vote proposal" }, { status: 400 });
 
     // Check user has a response to override
-    const existing = await sql`SELECT id FROM governance_responses WHERE proposal_id = ${id} AND wallet = ${wallet}`;
+    const existing =
+      await sql`SELECT id FROM governance_responses WHERE proposal_id = ${id} AND LOWER(wallet) = ${wallet}`;
     if (existing.rows.length === 0) {
       return NextResponse.json({ error: "No larva response to override" }, { status: 400 });
     }
 
     // Require active stake to override — prevents stake-briefly-then-exit governance manipulation.
     // accrual_rate mirrors current staked amount (set by cron); 0 means fully unstaked.
-    const stakeRow = await sql`SELECT accrual_rate FROM clawdviction_balances WHERE wallet = ${wallet}`;
-    if (stakeRow.rows.length === 0 || BigInt(stakeRow.rows[0].accrual_rate) === 0n) {
+    const stakeRow = await sql`SELECT accrual_rate FROM clawdviction_balances WHERE LOWER(wallet) = ${wallet}`;
+    if (stakeRow.rows.length === 0 || BigInt(Math.floor(Number(stakeRow.rows[0].accrual_rate))) === 0n) {
       return NextResponse.json({ error: "Must have active stake to override vote" }, { status: 403 });
     }
 
-    await sql`UPDATE governance_responses SET human_override = ${response} WHERE proposal_id = ${id} AND wallet = ${wallet}`;
+    await sql`UPDATE governance_responses SET human_override = ${response} WHERE proposal_id = ${id} AND LOWER(wallet) = ${wallet}`;
 
     return NextResponse.json({ ok: true });
   } catch (error) {

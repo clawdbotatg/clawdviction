@@ -117,7 +117,7 @@ export async function processQueueItem(item: QueueItem, apiKey: string): Promise
   // Store response — replace existing
   await sql`
     INSERT INTO governance_responses (proposal_id, wallet, response, reasoning)
-    VALUES (${item.proposal_id}, ${item.wallet}, ${responseText}, ${reasoning})
+    VALUES (${item.proposal_id}, ${walletLower}, ${responseText}, ${reasoning})
     ON CONFLICT (proposal_id, wallet) DO UPDATE SET
       response = ${responseText}, reasoning = ${reasoning}, created_at = NOW()`;
 
