@@ -140,6 +140,7 @@ const StakePage: NextPage = () => {
     try {
       const res = await fetch(`/api/clawdviction/${connectedAddress}`);
       const data = await res.json();
+      if (data.error) throw new Error("CV fetch error");
       setClawdvictionScore(data.clawdviction ?? "0");
       if (data.accrualRate != null) setCvAccrualRate(data.accrualRate);
       setCvBase(data.clawdviction ?? "0");

@@ -155,6 +155,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     });
   } catch (error) {
     console.error("Error reading clawdviction:", error);
-    return NextResponse.json({ clawdviction: "0", accrualRate: "0" });
+    return NextResponse.json({ clawdviction: "0", accrualRate: 0, error: true }, { status: 500 });
   }
 }

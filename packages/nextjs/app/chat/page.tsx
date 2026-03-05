@@ -68,12 +68,13 @@ const ChatPage: NextPage = () => {
       fetch(`/api/clawdviction/${address}`).then(r => r.json()),
       fetch(`/api/larva/${address}/status`).then(r => r.json()),
     ]);
-    // Only set clawdviction when we have a confirmed value — on failure leave null so spinner holds
-    if (cvResult.status === "fulfilled" && cvResult.value.clawdviction != null) {
+    // Only set clawdviction when we have a confirmed value — on error leave null so spinner holds (retry)
+    if (cvResult.status === "fulfilled" && !cvResult.value.error && cvResult.value.clawdviction != null) {
       setClawdviction(cvResult.value.clawdviction);
-    } else if (cvResult.status === "fulfilled") {
-      setClawdviction("0"); // API responded but returned nothing — treat as 0
+    } else if (cvResult.status === "fulfilled" && !cvResult.value.error) {
+      setClawdviction("0"); // API responded with no value and no error — treat as 0
     }
+    // If cvResult.value.error === true, leave clawdviction as null — safety timeout will unblock after 8s
     // larva status: best-effort, failure = stays false
     if (larvaResult.status === "fulfilled") {
       setLarvaRunning(larvaResult.value.running || false);
@@ -393,7 +394,11 @@ const ChatPage: NextPage = () => {
                 className="textarea textarea-bordered rounded-none flex-1 resize-none"
                 style={{ minHeight: "2.75rem", maxHeight: "10rem", overflowY: "auto" }}
               />
-              <button onClick={sendMessage} disabled={loading || !input.trim() || input.length > CHAT_MAX_LENGTH} className="btn btn-primary">
+              <button
+                onClick={sendMessage}
+                disabled={loading || !input.trim() || input.length > CHAT_MAX_LENGTH}
+                className="btn btn-primary"
+              >
                 Send
               </button>
             </div>
@@ -402,7 +407,9 @@ const ChatPage: NextPage = () => {
             <div className="flex justify-between items-center mt-1">
               <p className="text-xs text-base-content/30">costs 10K CV · need 1M to send again</p>
               {input.length > 0 && (
-                <span className={`text-xs tabular-nums ${input.length >= CHAT_MAX_LENGTH ? "text-error" : input.length >= CHAT_MAX_LENGTH * 0.85 ? "text-warning" : "text-base-content/30"}`}>
+                <span
+                  className={`text-xs tabular-nums ${input.length >= CHAT_MAX_LENGTH ? "text-error" : input.length >= CHAT_MAX_LENGTH * 0.85 ? "text-warning" : "text-base-content/30"}`}
+                >
                   {input.length} / {CHAT_MAX_LENGTH}
                 </span>
               )}
