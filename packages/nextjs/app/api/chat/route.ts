@@ -135,6 +135,15 @@ const VENICE_TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_governance_proposals",
+      description:
+        "Fetch all active governance proposals and RFCs on ClawdViction. Use this when the holder asks what votes or RFCs are currently on the table, what governance is happening, or how their larva will vote.",
+      parameters: { type: "object", properties: {}, required: [] as string[] },
+    },
+  },
 ];
 
 async function executeToolCall(name: string, input: Record<string, unknown>): Promise<string> {
@@ -262,6 +271,25 @@ async function executeToolCall(name: string, input: Record<string, unknown>): Pr
       // Truncate
       if (text.length > 3000) text = text.slice(0, 3000) + "…";
       return JSON.stringify({ url, content: text });
+    }
+
+    if (name === "get_governance_proposals") {
+      const res = await fetch("http://localhost:3000/api/gov", {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) return JSON.stringify({ error: `API returned ${res.status}` });
+      const proposals = await res.json();
+      // Shape it for the larva: id, type, title, question, status, response_count
+      const summary = proposals.map((p: Record<string, unknown>) => ({
+        id: p.id,
+        type: p.type, // "vote" or "rfc"
+        title: p.title,
+        question: p.question,
+        status: p.status,
+        response_count: p.response_count,
+        created_at: p.created_at,
+      }));
+      return JSON.stringify({ proposals: summary, count: summary.length });
     }
 
     return JSON.stringify({ error: "unknown tool" });
