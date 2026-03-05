@@ -114,12 +114,12 @@ export async function GET(request: NextRequest) {
         const existing = dbMap.get(w);
 
         if (existing) {
-          // Materialize pending accrual
+          // Materialize pending accrual — floor decimals before BigInt cast (Postgres numeric can have decimals)
           const lastAccrued = BigInt(Math.floor(new Date(existing.last_accrued_at).getTime() / 1000));
           const elapsed = nowUnix - lastAccrued;
-          const pending = (BigInt(existing.accrual_rate) * (elapsed > 0n ? elapsed : 0n)) / DIVISOR;
-          const newBalance = BigInt(existing.balance) + pending;
-          const newTotalEarned = BigInt(existing.total_earned) + pending;
+          const pending = (BigInt(Math.floor(Number(existing.accrual_rate))) * (elapsed > 0n ? elapsed : 0n)) / DIVISOR;
+          const newBalance = BigInt(Math.floor(Number(existing.balance))) + pending;
+          const newTotalEarned = BigInt(Math.floor(Number(existing.total_earned))) + pending;
 
           await sql`
             UPDATE clawdviction_balances SET
