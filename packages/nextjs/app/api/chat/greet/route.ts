@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "zai-org-glm-5",
+        model: "llama-3.3-70b",
         max_tokens: 800,
         messages: [
           { role: "system", content: systemPrompt },

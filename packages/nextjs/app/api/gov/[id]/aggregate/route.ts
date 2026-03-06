@@ -63,7 +63,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "zai-org-glm-5",
+        model: "llama-3.3-70b",
         max_tokens: 800,
         messages: [{ role: "user", content: systemPrompt + "\n\n" + userPrompt }],
         venice_parameters: { include_venice_system_prompt: false, strip_thinking_response: true },
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "zai-org-glm-5",
+        model: "llama-3.3-70b",
         max_tokens: 100,
         messages: [
           {

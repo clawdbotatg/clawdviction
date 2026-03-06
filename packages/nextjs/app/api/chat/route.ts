@@ -447,7 +447,7 @@ export async function POST(request: NextRequest) {
         method: "POST",
         headers: apiHeaders,
         body: JSON.stringify({
-          model: "zai-org-glm-5",
+          model: "llama-3.3-70b",
           max_tokens: 2000,
           messages: [{ role: "system", content: systemPrompt }, ...currentMessages],
           tools: VENICE_TOOLS,
