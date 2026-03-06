@@ -413,11 +413,6 @@ export async function POST(request: NextRequest) {
           // Either wallet not found or insufficient CV — either way, reject
           return NextResponse.json({ error: "Insufficient CV — need 1M to chat" }, { status: 402 });
         }
-
-        // CV deducted — now safe to save the user message
-        if (dbOk) {
-          await sql`INSERT INTO chat_messages (wallet, role, content) VALUES (${wallet}, 'user', ${message})`;
-        }
       } catch (e) {
         console.error("CV atomic deduction error:", e);
         // Fail open — save user message even if CV deduction threw, so history stays intact
@@ -425,6 +420,15 @@ export async function POST(request: NextRequest) {
           try {
             await sql`INSERT INTO chat_messages (wallet, role, content) VALUES (${wallet}, 'user', ${message}) ON CONFLICT DO NOTHING`;
           } catch {}
+        }
+      }
+
+      // CV deducted — now safe to save the user message (outside try/catch so errors surface)
+      if (dbOk) {
+        try {
+          await sql`INSERT INTO chat_messages (wallet, role, content) VALUES (${wallet}, 'user', ${message})`;
+        } catch (e) {
+          console.error("User message INSERT failed:", e);
         }
       }
     }
