@@ -415,18 +415,21 @@ export async function POST(request: NextRequest) {
         }
       } catch (e) {
         console.error("CV atomic deduction error:", e);
-        // Fail open — save user message even if CV deduction threw, so history stays intact
-        if (dbOk) {
-          try {
-            await sql`INSERT INTO chat_messages (wallet, role, content) VALUES (${wallet}, 'user', ${message}) ON CONFLICT DO NOTHING`;
-          } catch {}
-        }
+        // Fail open — the user message INSERT below (outside this try/catch) handles saving
       }
 
       // CV deducted — now safe to save the user message (outside try/catch so errors surface)
+      // Dedupe: skip if the same wallet+content was inserted in the last 5 seconds (double-submit guard)
       if (dbOk) {
         try {
-          await sql`INSERT INTO chat_messages (wallet, role, content) VALUES (${wallet}, 'user', ${message})`;
+          const recent = await sql`
+            SELECT id FROM chat_messages
+            WHERE wallet = ${wallet} AND role = 'user' AND content = ${message}
+              AND created_at > NOW() - INTERVAL '5 seconds'
+            LIMIT 1`;
+          if (recent.rows.length === 0) {
+            await sql`INSERT INTO chat_messages (wallet, role, content) VALUES (${wallet}, 'user', ${message})`;
+          }
         } catch (e) {
           console.error("User message INSERT failed:", e);
         }

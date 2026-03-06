@@ -31,3 +31,4 @@ packages/foundry/.gitmodules
 packages/foundry/foundry.lock
 packages/foundry/lib/
 .vercel
+.env*.local

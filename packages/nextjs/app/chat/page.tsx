@@ -46,6 +46,7 @@ const ChatPage: NextPage = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasTriggeredGreeting = useRef(false);
   const isInitialHistoryLoad = useRef(true);
+  const sendingRef = useRef(false);
 
   const loadHistory = useCallback(async () => {
     if (!address || !authData) return;
@@ -151,7 +152,8 @@ const ChatPage: NextPage = () => {
   };
 
   const sendMessage = async () => {
-    if (!input.trim() || loading || input.length > CHAT_MAX_LENGTH) return;
+    if (!input.trim() || loading || input.length > CHAT_MAX_LENGTH || sendingRef.current) return;
+    sendingRef.current = true;
     const userMessage = input.trim();
     setInput("");
     const updatedMessages: Message[] = [...messages, { role: "user", content: userMessage }];
@@ -171,6 +173,7 @@ const ChatPage: NextPage = () => {
       setMessages(prev => [...prev, { role: "assistant", content: "Something went wrong. Try again? 🦀" }]);
     } finally {
       setLoading(false);
+      sendingRef.current = false;
     }
   };
 
