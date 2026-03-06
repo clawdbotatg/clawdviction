@@ -431,7 +431,12 @@ export async function POST(request: NextRequest) {
     };
 
     // Convert history to OpenAI message format (system prompt separate)
-    const openaiHistory = history.map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
+    // Truncate very long individual messages — large messages (e.g. big specs/docs) cause GLM-5 to return empty content
+    const MAX_MSG_CHARS = 1500;
+    const openaiHistory = history.map(m => ({
+      role: m.role as "user" | "assistant",
+      content: m.content.length > MAX_MSG_CHARS ? m.content.slice(0, MAX_MSG_CHARS) + "… [truncated]" : m.content,
+    }));
     const currentMessages: {
       role: string;
       content: string | null;
