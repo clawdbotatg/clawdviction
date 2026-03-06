@@ -8,6 +8,49 @@ import { verifyAuth } from "~~/lib/verifyAuth";
 
 const LARVA_SYSTEM_PROMPT = LARVA_BASE_PROMPT;
 
+// --- Issue #17: Cap assistant response length before DB insert ---
+const MAX_ASSISTANT_LENGTH = 4000;
+const MAX_TOOL_RESULT_LENGTH = 3000;
+
+// --- Issue #16: Per-wallet sliding-window rate limiting ---
+const RATE_LIMIT_WINDOW_MS = 60_000; // 60 seconds
+const RATE_LIMIT_MAX_REQUESTS = 10; // max requests per window
+const rateLimitMap = new Map<string, number[]>(); // wallet -> timestamps
+
+function checkRateLimit(wallet: string): boolean {
+  const now = Date.now();
+  const cutoff = now - RATE_LIMIT_WINDOW_MS;
+  let timestamps = rateLimitMap.get(wallet);
+  if (!timestamps) {
+    timestamps = [];
+    rateLimitMap.set(wallet, timestamps);
+  }
+  // Evict old entries
+  const filtered = timestamps.filter(t => t > cutoff);
+  rateLimitMap.set(wallet, filtered);
+  if (filtered.length >= RATE_LIMIT_MAX_REQUESTS) {
+    return false; // rate limited
+  }
+  filtered.push(now);
+  return true; // allowed
+}
+
+// Periodic cleanup of stale entries (every 5 minutes)
+setInterval(
+  () => {
+    const cutoff = Date.now() - RATE_LIMIT_WINDOW_MS;
+    for (const [wallet, timestamps] of rateLimitMap) {
+      const filtered = timestamps.filter(t => t > cutoff);
+      if (filtered.length === 0) {
+        rateLimitMap.delete(wallet);
+      } else {
+        rateLimitMap.set(wallet, filtered);
+      }
+    }
+  },
+  5 * 60 * 1000,
+);
+
 const STAKING_CONTRACT = "0xC9E377FB98a1aA6Ecf4B553cE1b57940121213bf" as const;
 const UNISWAP_POOL = "0xCD55381a53da35Ab1D7Bc5e3fE5F76cac976FAc3" as const;
 const CLAWD_TOKEN = "0x9f86dB9fc6f7c9408e8Fda3Ff8ce4e78ac7a6b07" as const;
@@ -319,6 +362,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Rate limit check — BEFORE CV deduction (#16)
+    if (!checkRateLimit(wallet)) {
+      return NextResponse.json({ error: "Rate limited — max 10 messages per minute. Slow down! 🦞" }, { status: 429 });
+    }
+
     const apiKey = process.env.VENICE_API_KEY;
     const baseUrl = process.env.VENICE_BASE_URL || "https://api.venice.ai/api/v1";
     if (!apiKey) {
@@ -500,7 +548,11 @@ export async function POST(request: NextRequest) {
             } catch {
               /* ignore */
             }
-            const result = await executeToolCall(tc.function.name, toolInput);
+            let result = await executeToolCall(tc.function.name, toolInput);
+            // Truncate tool results before they enter message history (#17)
+            if (result.length > MAX_TOOL_RESULT_LENGTH) {
+              result = result.slice(0, MAX_TOOL_RESULT_LENGTH) + "… [truncated]";
+            }
             currentMessages.push({ role: "tool", tool_call_id: tc.id, name: tc.function.name, content: result });
           }
         }
@@ -538,9 +590,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (dbOk) {
+      // Cap assistant response length before DB insert (#17)
+      const dbAssistantMessage =
+        assistantMessage.length > MAX_ASSISTANT_LENGTH
+          ? assistantMessage.slice(0, MAX_ASSISTANT_LENGTH) + "… [truncated]"
+          : assistantMessage;
+
       // Save assistant reply
       await sql`
-        INSERT INTO chat_messages (wallet, role, content) VALUES (${wallet}, 'assistant', ${assistantMessage})`;
+        INSERT INTO chat_messages (wallet, role, content) VALUES (${wallet}, 'assistant', ${dbAssistantMessage})`;
 
       // Fire-and-forget memory compression check
       const countResult = await sql`SELECT COUNT(*) as cnt FROM chat_messages WHERE wallet = ${wallet}`;
