@@ -45,6 +45,7 @@ const ChatPage: NextPage = () => {
   }, [address]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasTriggeredGreeting = useRef(false);
+  const isInitialHistoryLoad = useRef(true);
 
   const loadHistory = useCallback(async () => {
     if (!address || !authData) return;
@@ -53,6 +54,7 @@ const ChatPage: NextPage = () => {
       const res = await authFetch(historyUrl, authData);
       const data = await res.json();
       if (data.messages?.length > 0) {
+        isInitialHistoryLoad.current = true;
         setMessages(data.messages as Message[]);
       }
     } catch {
@@ -118,7 +120,15 @@ const ChatPage: NextPage = () => {
   }, [address, isAuthenticated, checkOnboard, loadHistory, fetchStatus]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messages.length === 0) return;
+    // On initial history load: instant scroll (no animation from top)
+    // On new messages: smooth scroll
+    const behavior = isInitialHistoryLoad.current ? "instant" : "smooth";
+    isInitialHistoryLoad.current = false;
+    const timer = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: behavior as ScrollBehavior });
+    }, 100);
+    return () => clearTimeout(timer);
   }, [messages]);
 
   const cvBig = clawdviction !== null ? BigInt(clawdviction) : null;
