@@ -446,7 +446,8 @@ export async function POST(request: NextRequest) {
     }[] = [...openaiHistory, { role: "user", content: message }]; // append current message (not yet in DB)
     let assistantMessage = "🦞 *confused clicking*";
 
-    // Tool use loop (max 3 rounds to prevent runaway)
+    // Tool use loop (max 3 rounds to prevent runaway) + 2 retries on empty content (GLM-5 flapping)
+    let globalRetries = 0;
     for (let round = 0; round < 3; round++) {
       const response = await fetch(`${baseUrl}/chat/completions`, {
         method: "POST",
@@ -501,8 +502,22 @@ export async function POST(request: NextRequest) {
         // Truncated but has content — use it, just log the warning
         console.error("Larva hit max_tokens — round", round, "(truncated but has content)");
         assistantMessage = msg.content;
-      } else if (choice?.finish_reason === "length") {
-        console.error("Larva hit max_tokens with no content — round", round);
+      } else if (choice?.finish_reason === "length" || !msg?.content) {
+        // Empty content — GLM-5 flapping. Retry up to 2 times before giving up.
+        console.error(
+          "Venice returned empty content — finish:",
+          choice?.finish_reason,
+          "round:",
+          round,
+          "retry:",
+          globalRetries,
+        );
+        if (globalRetries < 2) {
+          globalRetries++;
+          round--; // don't advance round, just retry same messages
+          await new Promise(r => setTimeout(r, 500)); // brief pause before retry
+          continue;
+        }
         assistantMessage = "🦞 *clicks claws nervously* — try again?";
       } else {
         console.error("Unexpected Venice response shape:", JSON.stringify(data).slice(0, 500));
