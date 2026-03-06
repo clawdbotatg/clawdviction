@@ -420,7 +420,12 @@ export async function POST(request: NextRequest) {
         }
       } catch (e) {
         console.error("CV atomic deduction error:", e);
-        // Fail open only if DB is genuinely broken — log and continue
+        // Fail open — save user message even if CV deduction threw, so history stays intact
+        if (dbOk) {
+          try {
+            await sql`INSERT INTO chat_messages (wallet, role, content) VALUES (${wallet}, 'user', ${message}) ON CONFLICT DO NOTHING`;
+          } catch {}
+        }
       }
     }
 
