@@ -125,18 +125,18 @@ export async function compressMemory(wallet: string) {
 
     const transcript = older.rows.map(r => `${r.role}: ${r.content}`).join("\n");
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.VENICE_API_KEY;
+    const baseUrl = process.env.VENICE_BASE_URL || "https://api.venice.ai/api/v1";
     if (!apiKey) return;
 
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5",
+        model: "zai-org-glm-5",
         max_tokens: 500,
         messages: [
           {
@@ -144,11 +144,12 @@ export async function compressMemory(wallet: string) {
             content: `Summarize this conversation between a user and their AI governance larva. Preserve: key values, preferences, governance positions, personality traits, and any commitments made. Be concise but complete.\n\n${transcript}`,
           },
         ],
+        venice_parameters: { include_venice_system_prompt: false, strip_thinking_response: true },
       }),
     });
 
     const data = await res.json();
-    const snapshot = data.content?.[0]?.text;
+    const snapshot = data.choices?.[0]?.message?.content;
     if (!snapshot) return;
 
     await sql`
