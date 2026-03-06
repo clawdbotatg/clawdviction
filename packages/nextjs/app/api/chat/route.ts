@@ -438,7 +438,7 @@ export async function POST(request: NextRequest) {
       tool_calls?: unknown;
       tool_call_id?: string;
       name?: string;
-    }[] = [...openaiHistory];
+    }[] = [...openaiHistory, { role: "user", content: message }]; // append current message (not yet in DB)
     let assistantMessage = "🦞 *confused clicking*";
 
     // Tool use loop (max 3 rounds to prevent runaway)
