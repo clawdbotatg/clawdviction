@@ -40,19 +40,38 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     // Format responses for the prompt
+    // When a human has annotated or overridden a larva response, the human's position
+    // is the REAL position — the larva was just a first draft. Format accordingly.
     const formatted = responses.rows
       .map((r, i) => {
-        const effectiveResponse = r.human_override || r.response;
-        const note = r.human_note ? `\n  Human note: ${r.human_note}` : "";
         const cv = parseFloat(r.cv_balance).toFixed(0);
-        return `${i + 1}. Wallet ${r.wallet.slice(0, 6)}...${r.wallet.slice(-4)} (${cv} CV)\n  Response: ${effectiveResponse}${r.reasoning ? `\n  Reasoning: ${r.reasoning}` : ""}${note}`;
+        const walletLabel = `${r.wallet.slice(0, 6)}...${r.wallet.slice(-4)}`;
+
+        if (proposal.type === "vote") {
+          // Votes: human_override replaces the larva vote entirely
+          const effectiveVote = r.human_override || r.response;
+          const overridden = r.human_override && r.human_override !== r.response;
+          return `${i + 1}. Wallet ${walletLabel} (${cv} CV)\n  Vote: ${effectiveVote.toUpperCase()}${overridden ? ` [HUMAN CORRECTED — larva originally voted ${r.response}]` : ""}${r.reasoning ? `\n  Reasoning: ${r.reasoning}` : ""}`;
+        } else {
+          // RFCs: if human added a note, that IS the holder's real position
+          if (r.human_note) {
+            return `${i + 1}. Wallet ${walletLabel} (${cv} CV)\n  Position: ${r.human_note} [HUMAN — this is the holder's actual position]\n  (Larva originally said: ${r.response})`;
+          }
+          return `${i + 1}. Wallet ${walletLabel} (${cv} CV)\n  Position: ${r.response} [larva — no human correction]`;
+        }
       })
       .join("\n\n");
 
     const systemPrompt =
       proposal.type === "vote"
-        ? `You are synthesizing the results of a governance vote for $CLAWD token holders. Each holder's AI larva voted on their behalf, weighted by their CV (ClawdViction) score. Analyze the votes, note the majority position, highlight any interesting dissent or reasoning, and deliver a clear ruling. Be direct and decisive. 2-4 paragraphs.`
-        : `You are synthesizing community feedback on a governance RFC for $CLAWD token holders. Each holder's AI larva submitted a comment on their behalf, weighted by their CV (ClawdViction) score. Identify the dominant themes, areas of consensus, notable disagreements, and form an aggregated community opinion. Be insightful and direct. 2-4 paragraphs.`;
+        ? `You are synthesizing the results of a governance vote for $CLAWD token holders. Each holder's AI larva voted on their behalf, weighted by their CV (ClawdViction) score. When a vote is marked [HUMAN CORRECTED], the human's vote is the definitive position — the larva's original vote should be disregarded for tallying purposes. Analyze the votes, note the majority position, highlight any interesting dissent or reasoning, and deliver a clear ruling. Be direct and decisive. 2-4 paragraphs.`
+        : `You are synthesizing community feedback on a governance RFC for $CLAWD token holders. Each holder's AI larva submitted a comment on their behalf, weighted by their CV (ClawdViction) score.
+
+CRITICAL: When a response is marked [HUMAN], that is the holder's ACTUAL position and MUST be treated as their real stance. The larva's original comment was just a draft — the human correction supersedes it entirely. Weight the human's stated position as the definitive voice of that holder.
+
+Responses marked [larva — no human correction] represent the larva's best guess at the holder's position, unchallenged by the holder.
+
+Identify the dominant themes, areas of consensus, notable disagreements, and form an aggregated community opinion. Be insightful and direct. 2-4 paragraphs.`;
 
     const userPrompt = `Proposal: "${proposal.title}"\nQuestion: ${proposal.question}\n\nResponses (sorted by CV weight, highest first):\n\n${formatted}\n\n${proposal.type === "vote" ? "Form a ruling based on these votes." : "Form an aggregated community opinion from these comments."}`;
 
