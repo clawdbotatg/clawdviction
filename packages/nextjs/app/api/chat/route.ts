@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as dns from "node:dns/promises";
 import { createPublicClient, formatUnits, http } from "viem";
 import { base } from "viem/chains";
 import { compressMemory, initDb, isDbAvailable, sql } from "~~/lib/db";
@@ -274,7 +275,7 @@ async function executeToolCall(name: string, input: Record<string, unknown>): Pr
       const url = input.url as string;
       if (!url) return JSON.stringify({ error: "missing url" });
 
-      // SSRF protection — block private IPs, localhost, link-local
+      // SSRF protection — block private/internal IPs at BOTH hostname AND resolved IP level
       let parsed: URL;
       try {
         parsed = new URL(url);
@@ -284,19 +285,37 @@ async function executeToolCall(name: string, input: Record<string, unknown>): Pr
       if (!["http:", "https:"].includes(parsed.protocol)) {
         return JSON.stringify({ error: "invalid protocol" });
       }
+
+      const isPrivateIP = (ip: string): boolean => {
+        return (
+          ip === "127.0.0.1" ||
+          /^127\./.test(ip) ||
+          /^10\./.test(ip) ||
+          /^192\.168\./.test(ip) ||
+          /^172\.(1[6-9]|2\d|3[01])\./.test(ip) ||
+          /^169\.254\./.test(ip) ||
+          ip === "::1" ||
+          ip === "0.0.0.0" ||
+          /^fc00:/i.test(ip) ||
+          /^fe80:/i.test(ip) ||
+          /^fd/i.test(ip)
+        );
+      };
+
+      // Step 1: Block obvious hostname strings (fast path)
       const hostname = parsed.hostname;
-      const blocked =
-        hostname === "localhost" ||
-        /^127\./.test(hostname) ||
-        /^10\./.test(hostname) ||
-        /^192\.168\./.test(hostname) ||
-        /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
-        /^169\.254\./.test(hostname) ||
-        /^::1$/.test(hostname) ||
-        /^fc00:/i.test(hostname) ||
-        /^fe80:/i.test(hostname);
-      if (blocked) {
+      if (hostname === "localhost" || isPrivateIP(hostname)) {
         return JSON.stringify({ error: "private URLs not allowed" });
+      }
+
+      // Step 2: Resolve DNS and check the actual IP (defeats DNS rebinding)
+      try {
+        const { address } = await dns.lookup(hostname);
+        if (isPrivateIP(address)) {
+          return JSON.stringify({ error: "private URLs not allowed" });
+        }
+      } catch {
+        return JSON.stringify({ error: "DNS resolution failed" });
       }
 
       const res = await fetch(url, {
