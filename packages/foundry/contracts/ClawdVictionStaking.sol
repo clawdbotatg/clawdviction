@@ -34,15 +34,13 @@ contract ClawdVictionStaking {
 
     function stake(uint256 amount) external {
         require(amount >= MIN_STAKE, "Below minimum stake");
-        // Effects before interactions (CEI pattern)
+        clawdToken.safeTransferFrom(msg.sender, address(this), amount);
         uint256 stakeIndex = stakes[msg.sender].length;
         stakes[msg.sender].push(Stake({ amount: amount, stakedAt: block.timestamp }));
         totalStaked[msg.sender] += amount;
         totalSupplyStaked += amount;
         weightedStakeSum[msg.sender] += amount * block.timestamp;
         emit Staked(msg.sender, amount, stakeIndex, block.timestamp);
-        // Interaction last
-        clawdToken.safeTransferFrom(msg.sender, address(this), amount);
     }
 
     function unstake(uint256 stakeIndex) external {
