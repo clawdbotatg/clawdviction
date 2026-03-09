@@ -46,7 +46,7 @@ export const wagmiConnectors = () => {
     ],
 
     {
-      appName: "clawdviction",
+      appName: "larvai",
       projectId: scaffoldConfig.walletConnectProjectId,
     },
   );

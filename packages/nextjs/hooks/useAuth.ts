@@ -48,7 +48,7 @@ export function useAuth(address: string | undefined) {
     setSigning(true);
     try {
       const expiresAt = Date.now() + AUTH_DURATION_MS;
-      const message = `Sign in to ClawdViction\nWallet: ${address}\nExpires: ${new Date(expiresAt).toISOString()}`;
+      const message = `Sign in to larv.ai\nWallet: ${address}\nExpires: ${new Date(expiresAt).toISOString()}`;
       const signature = await signMessageAsync({ message });
       const data: AuthData = { signature, message, address, expiresAt };
       localStorage.setItem(storageKey(address), JSON.stringify(data));

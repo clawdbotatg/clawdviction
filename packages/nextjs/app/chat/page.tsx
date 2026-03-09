@@ -271,9 +271,9 @@ const ChatPage: NextPage = () => {
       <div className="flex items-center flex-col flex-grow pt-20 px-5">
         <div className="text-6xl mb-4">🦞</div>
         <div className="bg-base-100/60 backdrop-blur-sm rounded-none px-6 py-4 mb-6 text-center max-w-md">
-          <h2 className="text-2xl font-bold mb-2">Earn More ClawdViction</h2>
+          <h2 className="text-2xl font-bold mb-2">Earn More CV</h2>
           <p className="text-base-content/60">
-            You need 1,000,000 clawdviction to unlock your personal larva. Stake $CLAWD and let it grow over time.
+            You need 1,000,000 CV to unlock your personal larva. Stake $CLAWD and let it grow over time.
           </p>
         </div>
         <div className="w-full max-w-md mb-4">

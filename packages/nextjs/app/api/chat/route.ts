@@ -150,7 +150,7 @@ const VENICE_TOOLS = [
     type: "function" as const,
     function: {
       name: "get_wallet_cv_score",
-      description: "Look up a wallet's ClawdViction score, accrual rate, and balance.",
+      description: "Look up a wallet's conviction (CV) score, accrual rate, and balance.",
       parameters: {
         type: "object",
         properties: { wallet: { type: "string", description: "Ethereum address" } },
@@ -184,7 +184,7 @@ const VENICE_TOOLS = [
     function: {
       name: "get_governance_proposals",
       description:
-        "Fetch all active governance proposals and RFCs on ClawdViction. Use this when the holder asks what votes or RFCs are currently on the table, what governance is happening, or how their larva will vote.",
+        "Fetch all active governance proposals and RFCs on larv.ai. Use this when the holder asks what votes or RFCs are currently on the table, what governance is happening, or how their larva will vote.",
       parameters: { type: "object", properties: {}, required: [] as string[] },
     },
   },
@@ -320,7 +320,7 @@ async function executeToolCall(name: string, input: Record<string, unknown>): Pr
 
       const res = await fetch(url, {
         signal: AbortSignal.timeout(10000),
-        headers: { "User-Agent": "ClawdViction-Larva/1.0 (+https://clawdbotatg.eth.link)" },
+        headers: { "User-Agent": "LarvAI/1.0 (+https://larv.ai)" },
       });
       if (!res.ok) return JSON.stringify({ error: `HTTP ${res.status}` });
       let text = await res.text();

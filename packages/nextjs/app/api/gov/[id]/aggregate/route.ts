@@ -64,8 +64,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const systemPrompt =
       proposal.type === "vote"
-        ? `You are synthesizing the results of a governance vote for $CLAWD token holders. Each holder's AI larva voted on their behalf, weighted by their CV (ClawdViction) score. When a vote is marked [HUMAN CORRECTED], the human's vote is the definitive position — the larva's original vote should be disregarded for tallying purposes. Analyze the votes, note the majority position, highlight any interesting dissent or reasoning, and deliver a clear ruling. Be direct and decisive. 2-4 paragraphs.`
-        : `You are synthesizing community feedback on a governance RFC for $CLAWD token holders. Each holder's AI larva submitted a comment on their behalf, weighted by their CV (ClawdViction) score.
+        ? `You are synthesizing the results of a governance vote for $CLAWD token holders. Each holder's AI larva voted on their behalf, weighted by their CV (conviction) score. When a vote is marked [HUMAN CORRECTED], the human's vote is the definitive position — the larva's original vote should be disregarded for tallying purposes. Analyze the votes, note the majority position, highlight any interesting dissent or reasoning, and deliver a clear ruling. Be direct and decisive. 2-4 paragraphs.`
+        : `You are synthesizing community feedback on a governance RFC for $CLAWD token holders. Each holder's AI larva submitted a comment on their behalf, weighted by their CV (conviction) score.
 
 CRITICAL: When a response is marked [HUMAN], that is the holder's ACTUAL position and MUST be treated as their real stance. The larva's original comment was just a draft — the human correction supersedes it entirely. Weight the human's stated position as the definitive voice of that holder.
 

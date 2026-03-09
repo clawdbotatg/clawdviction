@@ -3,12 +3,12 @@ import type { Metadata } from "next";
 const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
   ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
   : `http://localhost:${process.env.PORT || 3000}`;
-const titleTemplate = "%s | ClawdViction";
+const titleTemplate = "%s | larv.ai";
 
 export const getMetadata = ({
   title,
   description,
-  imageRelativePath = "/thumbnail.png",
+  imageRelativePath = "/og-card.jpg",
 }: {
   title: string;
   description: string;

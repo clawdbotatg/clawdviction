@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyMessage } from "viem";
 import { initDb, isDbAvailable, sql } from "~~/lib/db";
 
-const CV_SPEND_MESSAGE = "ClawdViction CV Spend";
+const CV_SPEND_MESSAGE = "larv.ai CV Spend";
 const CV_SPEND_SECRET = process.env.CV_SPEND_SECRET;
 
 export async function POST(request: NextRequest) {

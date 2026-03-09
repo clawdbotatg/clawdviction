@@ -44,7 +44,7 @@ const Home: NextPage = () => {
               <div className="text-3xl">🥩</div>
               <h2 className="card-title text-error">Stake $CLAWD</h2>
               <p className="text-base-content/60">
-                Lock your tokens to earn ClawdViction. The longer you stake, the more governance weight you earn.
+                Lock your tokens to earn conviction. The longer you stake, the more governance weight you earn.
               </p>
             </div>
           </div>

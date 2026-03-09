@@ -6,8 +6,8 @@ import "~~/styles/globals.css";
 import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 
 export const metadata = getMetadata({
-  title: "ClawdViction",
-  description: "AI-powered conviction governance for CLAWD holders. Stake. Train. Govern.",
+  title: "larv.ai",
+  description: "AI-Powered Conviction Governance. Stake your $CLAWD. Train your larva. Let it govern on your behalf.",
 });
 
 const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
