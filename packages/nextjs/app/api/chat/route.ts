@@ -13,6 +13,9 @@ const LARVA_SYSTEM_PROMPT = LARVA_BASE_PROMPT;
 const MAX_ASSISTANT_LENGTH = 4000;
 const MAX_TOOL_RESULT_LENGTH = 3000;
 
+// Error response patterns — used to filter from history and prevent DB pollution
+const ERROR_PATTERNS = ["🦞 *confused clicking*", "🦞 *clicks claws nervously*", "🦞 Something went wrong"];
+
 // --- Issue #16: Per-wallet sliding-window rate limiting ---
 const RATE_LIMIT_WINDOW_MS = 60_000; // 60 seconds
 const RATE_LIMIT_MAX_REQUESTS = 10; // max requests per window
@@ -423,16 +426,32 @@ export async function POST(request: NextRequest) {
 
       const rawMessages = dbMessages.rows.reverse() as { role: string; content: string }[];
 
-      if (snapshot && rawMessages.length > 20) {
+      // Filter out error/fallback responses that poison the conversation context.
+      // Remove assistant error messages AND the user message immediately before each one,
+      // so the model doesn't see a chain of failed exchanges.
+      const cleanMessages: { role: string; content: string }[] = [];
+      for (let i = 0; i < rawMessages.length; i++) {
+        const msg = rawMessages[i];
+        if (msg.role === "assistant" && ERROR_PATTERNS.some(p => msg.content.startsWith(p))) {
+          // Skip this error response AND remove the preceding user message if we just pushed one
+          if (cleanMessages.length > 0 && cleanMessages[cleanMessages.length - 1].role === "user") {
+            cleanMessages.pop();
+          }
+          continue;
+        }
+        cleanMessages.push(msg);
+      }
+
+      if (snapshot && cleanMessages.length > 20) {
         // Snapshot + last 20 pattern
-        const last20 = rawMessages.slice(-20);
+        const last20 = cleanMessages.slice(-20);
         history = [
           { role: "user", content: `[Memory summary from previous conversations]: ${snapshot}` },
           { role: "assistant", content: "I remember our previous conversations. Let's continue! 🦞" },
           ...last20,
         ];
       } else {
-        history = rawMessages;
+        history = cleanMessages;
       }
     } else {
       // Fallback: use client-passed messages
@@ -608,7 +627,10 @@ export async function POST(request: NextRequest) {
       break;
     }
 
-    if (dbOk) {
+    // Don't save error/fallback responses to DB — they poison future conversation context
+    const isErrorResponse = ERROR_PATTERNS.some(p => assistantMessage.startsWith(p));
+
+    if (dbOk && !isErrorResponse) {
       // Cap assistant response length before DB insert (#17)
       const dbAssistantMessage =
         assistantMessage.length > MAX_ASSISTANT_LENGTH
