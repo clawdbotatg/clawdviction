@@ -400,6 +400,7 @@ export async function POST(request: NextRequest) {
 
     let history: { role: string; content: string }[];
     let onboardingContext: string | null = null;
+    let snapshot: string | undefined;
 
     if (dbOk) {
       // Fetch raw onboarding answers and format as full Q&A
@@ -415,7 +416,7 @@ export async function POST(request: NextRequest) {
 
       // Check for memory snapshot
       const snapshotResult = await sql`SELECT snapshot FROM memory_snapshots WHERE wallet = ${wallet}`;
-      const snapshot = snapshotResult.rows[0]?.snapshot;
+      snapshot = snapshotResult.rows[0]?.snapshot;
 
       // Load messages from DB
       const dbMessages = await sql`
@@ -443,13 +444,8 @@ export async function POST(request: NextRequest) {
       }
 
       if (snapshot && cleanMessages.length > 20) {
-        // Snapshot + last 20 pattern
-        const last20 = cleanMessages.slice(-20);
-        history = [
-          { role: "user", content: `[Memory summary from previous conversations]: ${snapshot}` },
-          { role: "assistant", content: "I remember our previous conversations. Let's continue! 🦞" },
-          ...last20,
-        ];
+        // Snapshot + last 20 pattern — use last 20 messages as recent context
+        history = cleanMessages.slice(-20);
       } else {
         history = cleanMessages;
       }
@@ -465,6 +461,9 @@ export async function POST(request: NextRequest) {
       LARVA_SYSTEM_PROMPT(wallet) +
       (onboardingContext
         ? `\n\nThis holder completed their onboarding interview. Below are their exact answers — treat these as the foundation of your understanding of who they are:\n\n${onboardingContext}`
+        : "") +
+      (snapshot
+        ? `\n\n## YOUR MEMORY OF THIS HOLDER\nThe following is your compressed memory from all previous conversations with this holder. This IS your memory — you learned all of this through past interactions. Reference it naturally, never say you "don't remember" things that are in here:\n\n${snapshot}`
         : "");
 
     // Gate + atomic deduction BEFORE calling Venice — prevents race condition exploits.
