@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
@@ -7,9 +8,26 @@ import { Address } from "~~/components/scaffold-eth";
 import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 
+function formatStat(n: number): string {
+  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(1) + "B";
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
+  return n.toFixed(0);
+}
+
 const Home: NextPage = () => {
   const { isConnected } = useAccount();
   const { data: stakingContractData } = useDeployedContractInfo("ClawdVictionStaking");
+  const [stats, setStats] = useState<{ totalStakedClawd: number; totalCvGenerated: number } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/stats")
+      .then(res => res.json())
+      .then(data => {
+        if (data.totalStakedClawd !== undefined) setStats(data);
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="flex items-center flex-col flex-grow">
@@ -36,6 +54,20 @@ const Home: NextPage = () => {
             Stake your tokens. Train your larva. Let it govern on your behalf.
           </p>
         </div>
+
+        {/* Protocol Stats */}
+        {stats && (
+          <div className="flex flex-row gap-4 mt-6 justify-center w-full max-w-2xl">
+            <div className="bg-base-200 rounded-none px-6 py-3 flex-1 max-w-sm text-center">
+              <p className="text-base-content/40 text-xs uppercase tracking-widest">Total Staked</p>
+              <p className="text-error font-bold text-xl">{formatStat(stats.totalStakedClawd)} $CLAWD</p>
+            </div>
+            <div className="bg-base-200 rounded-none px-6 py-3 flex-1 max-w-sm text-center">
+              <p className="text-base-content/40 text-xs uppercase tracking-widest">CV Generated</p>
+              <p className="text-error font-bold text-xl">{formatStat(stats.totalCvGenerated)} CV</p>
+            </div>
+          </div>
+        )}
 
         {/* How it works */}
         <div className="grid md:grid-cols-3 gap-6 mt-8 max-w-5xl w-full">
