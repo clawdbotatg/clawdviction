@@ -8,12 +8,14 @@ export async function GET() {
     const result = await sql`
       SELECT
         COALESCE(SUM(accrual_rate), 0) AS total_staked_wei,
-        COALESCE(SUM(balance), 0) AS total_cv_wei
+        COALESCE(SUM(total_earned), 0) AS total_cv_earned
       FROM clawdviction_balances`;
 
     const row = result.rows[0];
+    // accrual_rate is staked amount in wei — divide by 1e18 to get CLAWD
     const totalStakedClawd = Number(row.total_staked_wei) / 1e18;
-    const totalCvGenerated = Number(row.total_cv_wei) / 1e18;
+    // total_earned is already in human-readable CV units (cron divides by DIVISOR=1.728e24 before storing)
+    const totalCvGenerated = Number(row.total_cv_earned);
 
     return NextResponse.json({ totalStakedClawd, totalCvGenerated });
   } catch (error) {
