@@ -137,7 +137,7 @@ export async function compressMemory(wallet: string) {
       },
       body: JSON.stringify({
         model: "zai-org-glm-5",
-        max_tokens: 500,
+        max_tokens: 4000,
         messages: [
           {
             role: "user",

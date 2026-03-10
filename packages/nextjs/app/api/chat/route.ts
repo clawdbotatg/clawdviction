@@ -642,10 +642,15 @@ export async function POST(request: NextRequest) {
         INSERT INTO chat_messages (wallet, role, content) VALUES (${wallet}, 'assistant', ${dbAssistantMessage})`;
 
       // Fire-and-forget memory compression check
+      // Compress when: 40+ messages AND (no snapshot exists OR snapshot is 20+ messages stale)
       const countResult = await sql`SELECT COUNT(*) as cnt FROM chat_messages WHERE wallet = ${wallet}`;
       const count = parseInt(countResult.rows[0].cnt);
-      if (count >= 40 && count % 20 === 0) {
-        compressMemory(wallet).catch(() => {});
+      if (count >= 40) {
+        const snapResult = await sql`SELECT message_count FROM memory_snapshots WHERE wallet = ${wallet}`;
+        const lastSnapCount = snapResult.rows[0]?.message_count ?? 0;
+        if (lastSnapCount === 0 || count - lastSnapCount >= 20) {
+          compressMemory(wallet).catch(() => {});
+        }
       }
     }
 
