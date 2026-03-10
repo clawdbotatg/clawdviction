@@ -9,6 +9,13 @@ import { authFetch } from "~~/lib/authFetch";
 
 const ADMIN_WALLET = "0x11ce532845ce0eacda41f72fdc1c88c335981442";
 
+interface VoteOption {
+  id: string;
+  label: string;
+  earn_pct: number;
+  burn_pct: number;
+}
+
 interface ProposalData {
   proposal: {
     id: number;
@@ -20,6 +27,9 @@ interface ProposalData {
     status: string;
     aggregated_opinion?: string | null;
     aggregated_opinion_short?: string | null;
+    options?: VoteOption[] | null;
+    closes_at?: string | null;
+    duration_hours?: number | null;
   };
   responseCount: number;
   pendingCount: number;
@@ -29,19 +39,56 @@ interface ProposalData {
     reasoning: string | null;
     human_override: string | null;
     human_note: string | null;
+    chosen_option: string | null;
+    cv_committed: number | null;
     cv_balance: number;
     created_at: string;
   }[];
-  tallies?: { yes: number; no: number; abstain: number };
+  tallies?: Record<string, number>;
+  cvTotals?: Record<string, number>;
   userResponse?: {
     response: string;
     reasoning: string | null;
     human_override: string | null;
     human_note: string | null;
+    chosen_option: string | null;
+    cv_committed: number | null;
     cv_balance: number;
     created_at: string;
   } | null;
   queueStatus?: string | null;
+}
+
+function TimeRemaining({ closesAt }: { closesAt: string }) {
+  const [label, setLabel] = useState("");
+
+  useEffect(() => {
+    const update = () => {
+      const now = Date.now();
+      const end = new Date(closesAt).getTime();
+      const diff = end - now;
+      if (diff <= 0) {
+        setLabel("Voting closed");
+        return;
+      }
+      const hours = Math.floor(diff / 3600000);
+      const mins = Math.floor((diff % 3600000) / 60000);
+      if (hours > 0) {
+        setLabel(`${hours}h ${mins}m remaining`);
+      } else {
+        setLabel(`${mins}m remaining`);
+      }
+    };
+    update();
+    const interval = setInterval(update, 60000);
+    return () => clearInterval(interval);
+  }, [closesAt]);
+
+  if (!label) return null;
+  const isClosed = label === "Voting closed";
+  return (
+    <span className={`badge badge-sm rounded-none ${isClosed ? "badge-ghost" : "badge-warning"}`}>⏰ {label}</span>
+  );
 }
 
 export default function ProposalDetailPage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
@@ -57,6 +104,8 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
   const [refetchLoading, setRefetchLoading] = useState(false);
   const [collectResults, setCollectResults] = useState<{ wallet: string; response: string }[] | null>(null);
   const [aggregateLoading, setAggregateLoading] = useState(false);
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [cvAmount, setCvAmount] = useState<string>("100000");
 
   const isAdmin = address?.toLowerCase() === ADMIN_WALLET;
 
@@ -78,14 +127,29 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id, isAuthenticated, authData]);
 
-  const handleOverride = async (vote: "yes" | "no" | "abstain") => {
+  const hasOptions =
+    data?.proposal?.options && Array.isArray(data.proposal.options) && data.proposal.options.length > 0;
+  const isMultiOptionVote = data?.proposal?.type === "vote" && hasOptions;
+  const isLegacyVote = data?.proposal?.type === "vote" && !hasOptions;
+
+  const handleOverride = async (vote: string) => {
     if (!authData) return;
     setOverrideLoading(true);
     try {
-      await authFetch(`/api/gov/${params.id}/override`, authData, {
-        method: "POST",
-        body: JSON.stringify({ response: vote }),
-      });
+      if (isMultiOptionVote) {
+        await authFetch(`/api/gov/${params.id}/override`, authData, {
+          method: "POST",
+          body: JSON.stringify({
+            chosen_option: vote,
+            cv_committed: parseInt(cvAmount) || 100000,
+          }),
+        });
+      } else {
+        await authFetch(`/api/gov/${params.id}/override`, authData, {
+          method: "POST",
+          body: JSON.stringify({ response: vote }),
+        });
+      }
       await fetchData();
     } catch {
       /* ignore */
@@ -121,8 +185,11 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
     return <div className="text-center py-20">Proposal not found.</div>;
   }
 
-  const { proposal, responseCount, pendingCount, responses, tallies, userResponse, queueStatus } = data;
-  const totalVotes = tallies ? tallies.yes + tallies.no + tallies.abstain : 0;
+  const { proposal, responseCount, pendingCount, responses, tallies, cvTotals, userResponse, queueStatus } = data;
+
+  // Compute total votes for bar widths
+  const totalVotes = tallies ? Object.values(tallies).reduce((a, b) => a + b, 0) : 0;
+  const totalCv = cvTotals ? Object.values(cvTotals).reduce((a, b) => a + b, 0) : 0;
 
   return (
     <div className="flex flex-col items-center min-h-screen pt-10 px-4">
@@ -131,16 +198,36 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
           ← Back to Gov
         </Link>
 
+        {/* Proposal Header */}
         <div className="card rounded-none bg-base-200 shadow-md mb-6">
           <div className="card-body">
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
               <span className={`badge rounded-none ${proposal.type === "vote" ? "badge-error" : "badge-info"}`}>
                 {proposal.type.toUpperCase()}
               </span>
+              {isMultiOptionVote && (
+                <span className="badge badge-sm rounded-none badge-outline">{proposal.options!.length} options</span>
+              )}
+              {proposal.closes_at && <TimeRemaining closesAt={proposal.closes_at} />}
               <span className="text-sm text-base-content/50">{new Date(proposal.created_at).toLocaleDateString()}</span>
             </div>
             <h1 className="text-2xl font-bold">{proposal.title}</h1>
             <p className="mt-2 whitespace-pre-wrap">{proposal.question}</p>
+
+            {/* Show options summary for multi-option votes */}
+            {isMultiOptionVote && (
+              <div className="mt-4 space-y-2">
+                {proposal.options!.map(opt => (
+                  <div key={opt.id} className="flex items-center gap-3 text-sm bg-base-300 px-3 py-2">
+                    <span className="font-mono font-bold min-w-[3rem]">{opt.id}</span>
+                    <span className="flex-1">{opt.label}</span>
+                    <span className="text-success">{opt.earn_pct}% earn</span>
+                    <span className="text-error">{opt.burn_pct}% burn</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <p className="text-sm text-base-content/50 mt-3">
               {responseCount} response{responseCount !== 1 ? "s" : ""}
               {pendingCount > 0 && ` · ${pendingCount} pending`}
@@ -238,13 +325,48 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
           </div>
         )}
 
-        {/* Admin view: vote tallies + full responses */}
-        {isAdmin && isAuthenticated && tallies && totalVotes > 0 && (
+        {/* Vote Tallies — Multi-option */}
+        {isAdmin && isAuthenticated && isMultiOptionVote && tallies && totalVotes > 0 && (
+          <div className="card rounded-none bg-base-200 shadow-md mb-6">
+            <div className="card-body">
+              <h2 className="text-lg font-semibold mb-3">Vote Tallies</h2>
+              {proposal.options!.map((opt, idx) => {
+                const count = tallies[opt.id] || 0;
+                const cv = cvTotals?.[opt.id] || 0;
+                const pct = totalVotes > 0 ? (count / totalVotes) * 100 : 0;
+                const colors = ["bg-primary", "bg-secondary", "bg-accent", "bg-info", "bg-success", "bg-warning"];
+                const barColor = colors[idx % colors.length];
+                return (
+                  <div key={opt.id} className="mb-3">
+                    <div className="flex justify-between text-sm mb-1">
+                      <span>
+                        <span className="font-bold">{opt.label}</span>
+                        <span className="text-base-content/50 ml-1">({opt.id})</span>
+                      </span>
+                      <span>
+                        {count} vote{count !== 1 ? "s" : ""} · {cv.toLocaleString()} CV ({pct.toFixed(1)}%)
+                      </span>
+                    </div>
+                    <div className="w-full bg-base-300 h-4">
+                      <div className={`${barColor} h-4 transition-all`} style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+              {totalCv > 0 && (
+                <p className="text-sm text-base-content/50 mt-2">Total CV committed: {totalCv.toLocaleString()}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Vote Tallies — Legacy yes/no/abstain */}
+        {isAdmin && isAuthenticated && isLegacyVote && tallies && totalVotes > 0 && (
           <div className="card rounded-none bg-base-200 shadow-md mb-6">
             <div className="card-body">
               <h2 className="text-lg font-semibold mb-3">Vote Tallies</h2>
               {(["yes", "no", "abstain"] as const).map(key => {
-                const count = tallies[key];
+                const count = (tallies as Record<string, number>)[key] || 0;
                 const pct = totalVotes > 0 ? (count / totalVotes) * 100 : 0;
                 const colors = { yes: "bg-success", no: "bg-error", abstain: "bg-warning" };
                 return (
@@ -265,6 +387,7 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
           </div>
         )}
 
+        {/* Admin: All Responses Table */}
         {isAdmin && isAuthenticated && responses && responses.length > 0 && (
           <div className="card rounded-none bg-base-200 shadow-md mb-6">
             <div className="card-body">
@@ -275,8 +398,9 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
                     <tr>
                       <th>Wallet</th>
                       <th>CV Balance</th>
-                      <th>{proposal.type === "vote" ? "Vote" : "Response"}</th>
+                      <th>{isMultiOptionVote ? "Option" : proposal.type === "vote" ? "Vote" : "Response"}</th>
                       {proposal.type === "vote" && <th>Override</th>}
+                      {isMultiOptionVote && <th>CV Committed</th>}
                       {proposal.type === "vote" && <th>Reasoning</th>}
                       {proposal.type === "rfc" && <th>Human Note</th>}
                     </tr>
@@ -288,9 +412,16 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
                           {r.wallet.slice(0, 6)}...{r.wallet.slice(-4)}
                         </td>
                         <td className="text-xs font-mono">{Number(r.cv_balance).toFixed(1)}</td>
-                        <td className="max-w-xs truncate">{r.response}</td>
+                        <td className="max-w-xs truncate">
+                          {isMultiOptionVote ? r.chosen_option || r.response : r.response}
+                        </td>
                         {proposal.type === "vote" && (
                           <td className="text-xs">{r.human_override ? r.human_override.toUpperCase() : "—"}</td>
+                        )}
+                        {isMultiOptionVote && (
+                          <td className="text-xs font-mono">
+                            {r.cv_committed ? r.cv_committed.toLocaleString() : "—"}
+                          </td>
                         )}
                         {proposal.type === "vote" && (
                           <td className="max-w-sm text-xs truncate">{r.reasoning || "—"}</td>
@@ -371,13 +502,100 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
                 <>
                   <div>
                     <div className="bg-primary text-primary-content px-4 py-3 whitespace-pre-wrap">
-                      {userResponse.response}
+                      {isMultiOptionVote && userResponse.chosen_option ? (
+                        <>
+                          <span className="font-bold text-lg">{userResponse.chosen_option.toUpperCase()}</span>
+                          {userResponse.cv_committed && (
+                            <span className="ml-2 text-sm opacity-80">
+                              ({userResponse.cv_committed.toLocaleString()} CV committed)
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        userResponse.response
+                      )}
                       {userResponse.reasoning && <p className="mt-2 text-sm opacity-80">{userResponse.reasoning}</p>}
                     </div>
                   </div>
 
-                  {/* Human vote override for vote proposals */}
-                  {proposal.type === "vote" && (
+                  {/* Human override: multi-option vote */}
+                  {isMultiOptionVote && (
+                    <div className="mt-4">
+                      <p className="text-sm font-semibold mb-2">Override your larva&apos;s vote:</p>
+                      <div className="space-y-2 mb-3">
+                        {proposal.options!.map(opt => {
+                          const effectiveChoice = userResponse.human_override || userResponse.chosen_option;
+                          const isSelected =
+                            selectedOption === opt.id || (!selectedOption && effectiveChoice === opt.id);
+                          return (
+                            <button
+                              key={opt.id}
+                              className={`w-full text-left px-4 py-3 border transition-all ${
+                                isSelected
+                                  ? "border-primary bg-primary/10"
+                                  : "border-base-content/20 hover:border-base-content/40"
+                              }`}
+                              disabled={overrideLoading}
+                              onClick={() => setSelectedOption(opt.id)}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <span className="font-bold">{opt.label}</span>
+                                  <span className="text-base-content/50 ml-2 text-sm">({opt.id})</span>
+                                </div>
+                                <div className="text-sm">
+                                  <span className="text-success mr-3">{opt.earn_pct}% earn</span>
+                                  <span className="text-error">{opt.burn_pct}% burn</span>
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <div className="form-control flex-1">
+                          <label className="label py-1">
+                            <span className="label-text text-xs">CV to commit</span>
+                          </label>
+                          <input
+                            type="number"
+                            className="input input-bordered input-sm rounded-none w-full"
+                            value={cvAmount}
+                            onChange={e => setCvAmount(e.target.value)}
+                            min="0"
+                          />
+                        </div>
+                        <button
+                          className="btn btn-primary btn-sm rounded-none mt-6"
+                          disabled={overrideLoading || !selectedOption}
+                          onClick={() => {
+                            if (selectedOption) handleOverride(selectedOption);
+                          }}
+                        >
+                          {overrideLoading ? (
+                            <>
+                              <span className="loading loading-spinner loading-sm" />
+                              Submitting...
+                            </>
+                          ) : (
+                            "Submit Override"
+                          )}
+                        </button>
+                      </div>
+
+                      {userResponse.human_override && (
+                        <p className="text-xs text-base-content/50 mt-2">
+                          Your current override:{" "}
+                          <span className="font-bold">{userResponse.human_override.toUpperCase()}</span>
+                          {userResponse.cv_committed && <span> · {userResponse.cv_committed.toLocaleString()} CV</span>}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Human override: legacy yes/no/abstain vote */}
+                  {isLegacyVote && (
                     <div className="mt-4">
                       <p className="text-sm font-semibold mb-2">Override your larva&apos;s vote:</p>
                       <div className="flex gap-2">

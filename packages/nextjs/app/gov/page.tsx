@@ -16,6 +16,24 @@ interface Proposal {
   created_at: string;
   status: string;
   response_count: number;
+  options?: { id: string; label: string }[] | null;
+  closes_at?: string | null;
+  duration_hours?: number | null;
+}
+
+function ClosesAtLabel({ closesAt }: { closesAt: string }) {
+  const now = Date.now();
+  const end = new Date(closesAt).getTime();
+  const diff = end - now;
+  if (diff <= 0) {
+    return <span className="text-xs text-base-content/50">Closed</span>;
+  }
+  const hours = Math.floor(diff / 3600000);
+  if (hours > 0) {
+    return <span className="text-xs text-warning">Closes in {hours}h</span>;
+  }
+  const mins = Math.floor(diff / 60000);
+  return <span className="text-xs text-warning">Closes in {mins}m</span>;
 }
 
 const GovPage: NextPage = () => {
@@ -60,10 +78,14 @@ const GovPage: NextPage = () => {
                 <div className="card-body py-4 px-5">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className={`badge badge-sm ${p.type === "vote" ? "badge-error" : "badge-info"}`}>
                           {p.type.toUpperCase()}
                         </span>
+                        {p.options && Array.isArray(p.options) && p.options.length > 0 && (
+                          <span className="badge badge-sm badge-outline">{p.options.length} options</span>
+                        )}
+                        {p.closes_at && <ClosesAtLabel closesAt={p.closes_at} />}
                         <span className="text-xs text-base-content/50">
                           {new Date(p.created_at).toLocaleDateString()}
                         </span>
