@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     await initDb();
 
     const pending = await sql`
-      SELECT q.id, q.proposal_id, q.wallet, p.type, p.title, p.question
+      SELECT q.id, q.proposal_id, q.wallet, p.type, p.title, p.question, p.options
       FROM governance_queue q
       JOIN governance_proposals p ON p.id = q.proposal_id
       WHERE q.status = 'pending'

@@ -44,7 +44,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     const pending = await sql`
-      SELECT q.id, q.proposal_id, q.wallet, p.type, p.title, p.question
+      SELECT q.id, q.proposal_id, q.wallet, p.type, p.title, p.question, p.options
       FROM governance_queue q
       JOIN governance_proposals p ON p.id = q.proposal_id
       WHERE q.proposal_id = ${id} AND q.status = 'pending'

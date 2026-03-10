@@ -2,6 +2,13 @@ import { compressMemory, sql } from "~~/lib/db";
 import { LARVA_BASE_PROMPT } from "~~/lib/larvaContext";
 import { formatAnswersAsQA } from "~~/lib/questions";
 
+export interface VoteOption {
+  id: string;
+  label: string;
+  earn_pct: number;
+  burn_pct: number;
+}
+
 export interface QueueItem {
   id: number;
   proposal_id: number;
@@ -9,6 +16,7 @@ export interface QueueItem {
   type: string;
   title: string;
   question: string;
+  options: VoteOption[] | null;
 }
 
 export async function processQueueItem(item: QueueItem, apiKey: string): Promise<{ wallet: string; response: string }> {
@@ -75,10 +83,20 @@ export async function processQueueItem(item: QueueItem, apiKey: string): Promise
     (memorySnapshot ? `\n\nMemory summary from previous conversations:\n${memorySnapshot}` : "") +
     (chatContext ? `\n\nRecent chat history:\n${chatContext}` : "");
 
-  const userMessage =
-    item.type === "vote"
-      ? `GOVERNANCE VOTE: "${item.title}"\n\nQuestion: ${item.question}\n\nBased on everything you know about this holder's values and preferences, respond with ONLY "yes", "no", or "abstain" on the first line, then explain your reasoning on the following lines.`
-      : `GOVERNANCE RFC: "${item.title}"\n\nQuestion: ${item.question}\n\nBased on everything you know about this holder's values and preferences, provide a thoughtful comment representing their perspective. Keep it to 2-4 sentences.`;
+  let userMessage: string;
+  if (item.type === "vote" && item.options && item.options.length > 0) {
+    // Multi-option vote
+    const optionLines = item.options
+      .map(o => `- ${o.id}: ${o.label} (${o.earn_pct}% earn, ${o.burn_pct}% burned)`)
+      .join("\n");
+    const validIds = item.options.map(o => o.id).join('", "');
+    userMessage = `GOVERNANCE VOTE: "${item.title}"\n\nQuestion: ${item.question}\n\nOptions:\n${optionLines}\n\nBased on everything you know about this holder's values and preferences, respond with ONLY the option ID on the first line (e.g. "${validIds}"), then explain your reasoning on the following lines. Commit 100000 CV to this vote.`;
+  } else if (item.type === "vote") {
+    // Legacy yes/no/abstain vote (no options)
+    userMessage = `GOVERNANCE VOTE: "${item.title}"\n\nQuestion: ${item.question}\n\nBased on everything you know about this holder's values and preferences, respond with ONLY "yes", "no", or "abstain" on the first line, then explain your reasoning on the following lines.`;
+  } else {
+    userMessage = `GOVERNANCE RFC: "${item.title}"\n\nQuestion: ${item.question}\n\nBased on everything you know about this holder's values and preferences, provide a thoughtful comment representing their perspective. Keep it to 2-4 sentences.`;
+  }
 
   const baseUrl = process.env.VENICE_BASE_URL || "https://api.venice.ai/api/v1";
   const response = await fetch(`${baseUrl}/chat/completions`, {
@@ -103,8 +121,31 @@ export async function processQueueItem(item: QueueItem, apiKey: string): Promise
 
   let responseText = text;
   let reasoning: string | null = null;
+  let chosenOption: string | null = null;
+  let cvCommitted: number | null = null;
 
-  if (item.type === "vote") {
+  if (item.type === "vote" && item.options && item.options.length > 0) {
+    // Multi-option vote: parse the chosen option ID from the first line
+    const lines = text.trim().split("\n");
+    const firstLine = lines[0]
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, "")
+      .trim();
+    const validIds = item.options.map(o => o.id.toLowerCase());
+
+    // Try exact match first, then substring match
+    if (validIds.includes(firstLine)) {
+      chosenOption = item.options[validIds.indexOf(firstLine)].id;
+    } else {
+      const found = validIds.find(vid => firstLine.includes(vid));
+      chosenOption = found ? item.options[validIds.indexOf(found)].id : item.options[0].id;
+    }
+
+    responseText = chosenOption;
+    reasoning = lines.slice(1).join("\n").trim() || null;
+    cvCommitted = 100000;
+  } else if (item.type === "vote") {
+    // Legacy yes/no/abstain vote
     const lines = text.trim().split("\n");
     const firstLine = lines[0].toLowerCase().trim();
     if (firstLine.includes("yes")) responseText = "yes";
@@ -116,10 +157,12 @@ export async function processQueueItem(item: QueueItem, apiKey: string): Promise
 
   // Store response — replace existing
   await sql`
-    INSERT INTO governance_responses (proposal_id, wallet, response, reasoning)
-    VALUES (${item.proposal_id}, ${walletLower}, ${responseText}, ${reasoning})
+    INSERT INTO governance_responses (proposal_id, wallet, response, reasoning, chosen_option, cv_committed)
+    VALUES (${item.proposal_id}, ${walletLower}, ${responseText}, ${reasoning}, ${chosenOption}, ${cvCommitted})
     ON CONFLICT (proposal_id, wallet) DO UPDATE SET
-      response = ${responseText}, reasoning = ${reasoning}, created_at = NOW()`;
+      response = ${responseText}, reasoning = ${reasoning},
+      chosen_option = ${chosenOption}, cv_committed = ${cvCommitted},
+      created_at = NOW()`;
 
   await sql`UPDATE governance_queue SET status = 'done', processed_at = NOW() WHERE id = ${item.id}`;
 
