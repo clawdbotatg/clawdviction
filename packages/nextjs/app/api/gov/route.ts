@@ -8,7 +8,9 @@ export async function GET() {
   try {
     await initDb();
     const result = await sql`
-      SELECT p.*, COUNT(r.id)::int as response_count
+      SELECT p.id, p.type, p.title, p.question, p.created_by, p.created_at, p.status,
+             p.options, p.closes_at, p.duration_hours,
+             COUNT(r.id)::int as response_count
       FROM governance_proposals p
       LEFT JOIN governance_responses r ON r.proposal_id = p.id
       GROUP BY p.id
@@ -27,17 +29,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Admin only" }, { status: 403 });
     }
 
-    const { title, question, type } = await request.json();
+    const { title, question, type, options, duration_hours } = await request.json();
     if (!title || !question || !type || !["rfc", "vote"].includes(type)) {
       return NextResponse.json({ error: "Missing or invalid fields" }, { status: 400 });
     }
 
     await initDb();
 
-    const result = await sql`
-      INSERT INTO governance_proposals (type, title, question, created_by)
-      VALUES (${type}, ${title}, ${question}, ${wallet})
-      RETURNING *`;
+    let result;
+    if (type === "vote" && options && Array.isArray(options) && options.length > 0) {
+      const durationHrs = typeof duration_hours === "number" && duration_hours > 0 ? duration_hours : 24;
+      result = await sql`
+        INSERT INTO governance_proposals (type, title, question, created_by, options, duration_hours, closes_at)
+        VALUES (${type}, ${title}, ${question}, ${wallet}, ${JSON.stringify(options)}::jsonb, ${durationHrs}, NOW() + ${durationHrs + " hours"}::interval)
+        RETURNING *`;
+    } else {
+      result = await sql`
+        INSERT INTO governance_proposals (type, title, question, created_by)
+        VALUES (${type}, ${title}, ${question}, ${wallet})
+        RETURNING *`;
+    }
 
     const proposal = result.rows[0];
 

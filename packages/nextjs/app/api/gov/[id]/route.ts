@@ -32,32 +32,60 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       // Admin: full response list joined with CV balance, sorted by balance DESC
       const responses = await sql`
         SELECT gr.wallet, gr.response, gr.reasoning, gr.human_override, gr.human_note, gr.created_at,
+               gr.chosen_option, gr.cv_committed,
                COALESCE(cb.balance, 0)::numeric as cv_balance
         FROM governance_responses gr
         LEFT JOIN clawdviction_balances cb ON gr.wallet = cb.wallet
         WHERE gr.proposal_id = ${id}
         ORDER BY cv_balance DESC`;
 
-      // Vote tallies — use human_override when present
+      // Vote tallies
       let tallies = null;
+      let cvTotals = null;
       if (proposal.type === "vote") {
-        const tallyResult = await sql`
-          SELECT COALESCE(human_override, response) as effective_vote, COUNT(*)::int as count
-          FROM governance_responses
-          WHERE proposal_id = ${id}
-          GROUP BY effective_vote`;
-        tallies = { yes: 0, no: 0, abstain: 0 };
-        for (const row of tallyResult.rows) {
-          const key = row.effective_vote.toLowerCase().trim();
-          if (key in tallies) tallies[key as keyof typeof tallies] = row.count;
+        if (proposal.options && Array.isArray(proposal.options)) {
+          // Multi-option vote: tally by chosen_option (use human_override as chosen_option if set)
+          const tallyResult = await sql`
+            SELECT COALESCE(human_override, chosen_option, response) as effective_option,
+                   COUNT(*)::int as count,
+                   COALESCE(SUM(cv_committed), 0)::bigint as cv_total
+            FROM governance_responses
+            WHERE proposal_id = ${id}
+            GROUP BY effective_option`;
+          tallies = {} as Record<string, number>;
+          cvTotals = {} as Record<string, number>;
+          for (const opt of proposal.options as { id: string }[]) {
+            tallies[opt.id] = 0;
+            cvTotals[opt.id] = 0;
+          }
+          for (const row of tallyResult.rows) {
+            const key = (row.effective_option || "").toLowerCase().trim();
+            if (key in tallies) {
+              tallies[key] = row.count;
+              cvTotals[key] = Number(row.cv_total);
+            }
+          }
+        } else {
+          // Legacy yes/no/abstain vote
+          const tallyResult = await sql`
+            SELECT COALESCE(human_override, response) as effective_vote, COUNT(*)::int as count
+            FROM governance_responses
+            WHERE proposal_id = ${id}
+            GROUP BY effective_vote`;
+          tallies = { yes: 0, no: 0, abstain: 0 };
+          for (const row of tallyResult.rows) {
+            const key = row.effective_vote.toLowerCase().trim();
+            if (key in tallies) tallies[key as keyof typeof tallies] = row.count;
+          }
         }
       }
 
-      return NextResponse.json({ proposal, responseCount, pendingCount, responses: responses.rows, tallies });
+      return NextResponse.json({ proposal, responseCount, pendingCount, responses: responses.rows, tallies, cvTotals });
     } else if (wallet) {
       // Regular user: their response + queue status
       const userResponse = await sql`
         SELECT gr.response, gr.reasoning, gr.human_override, gr.human_note, gr.created_at,
+               gr.chosen_option, gr.cv_committed,
                COALESCE(cb.balance, 0)::numeric as cv_balance
         FROM governance_responses gr
         LEFT JOIN clawdviction_balances cb ON gr.wallet = cb.wallet
