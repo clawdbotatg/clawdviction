@@ -36,6 +36,10 @@ export const menuLinks: HeaderMenuLink[] = [
     href: "/gov",
   },
   {
+    label: "Forum",
+    href: "/forum",
+  },
+  {
     label: "About",
     href: "/about",
   },
