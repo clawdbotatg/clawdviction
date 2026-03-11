@@ -8,18 +8,11 @@ import { authFetch } from "~~/lib/authFetch";
 
 const ADMIN_WALLET = "0x11ce532845ce0eacda41f72fdc1c88c335981442";
 
-interface VoteOption {
-  id: string;
-  label: string;
-  earn_pct: number;
-  burn_pct: number;
-}
-
-const DEFAULT_OPTIONS: VoteOption[] = [
-  { id: "none", label: "None", earn_pct: 0, burn_pct: 0 },
-  { id: "1mo", label: "1 month lockup", earn_pct: 0.5, burn_pct: 1 },
-  { id: "3mo", label: "3 months lockup", earn_pct: 2, burn_pct: 3 },
-  { id: "6mo", label: "6 months lockup", earn_pct: 5, burn_pct: 5 },
+const DEFAULT_OPTIONS: string[] = [
+  "None",
+  "1 month, 0.5% yield, 1% burn",
+  "3 months, 2% yield, 3% burn",
+  "6 months, 5% yield, 5% burn",
 ];
 
 export default function CreateProposalPage() {
@@ -31,7 +24,7 @@ export default function CreateProposalPage() {
   const [type, setType] = useState<"rfc" | "vote">("rfc");
   const [question, setQuestion] = useState("");
   const [durationHours, setDurationHours] = useState(24);
-  const [options, setOptions] = useState<VoteOption[]>(DEFAULT_OPTIONS);
+  const [options, setOptions] = useState<string[]>(DEFAULT_OPTIONS);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -56,12 +49,12 @@ export default function CreateProposalPage() {
     );
   }
 
-  const updateOption = (idx: number, field: keyof VoteOption, value: string | number) => {
-    setOptions(prev => prev.map((opt, i) => (i === idx ? { ...opt, [field]: value } : opt)));
+  const updateOption = (idx: number, value: string) => {
+    setOptions(prev => prev.map((opt, i) => (i === idx ? value : opt)));
   };
 
   const addOption = () => {
-    setOptions(prev => [...prev, { id: "", label: "", earn_pct: 0, burn_pct: 0 }]);
+    setOptions(prev => [...prev, ""]);
   };
 
   const removeOption = (idx: number) => {
@@ -78,15 +71,17 @@ export default function CreateProposalPage() {
 
     if (type === "vote") {
       // Validate options
-      for (const opt of options) {
-        if (!opt.id.trim() || !opt.label.trim()) {
-          setError("All options need an ID and label.");
-          return;
-        }
+      const trimmed = options.map(o => o.trim());
+      if (trimmed.some(o => !o)) {
+        setError("All options must have text.");
+        return;
       }
-      const ids = options.map(o => o.id.trim());
-      if (new Set(ids).size !== ids.length) {
-        setError("Option IDs must be unique.");
+      if (new Set(trimmed).size !== trimmed.length) {
+        setError("Options must be unique.");
+        return;
+      }
+      if (trimmed.length < 2) {
+        setError("At least 2 options required.");
         return;
       }
     }
@@ -96,12 +91,7 @@ export default function CreateProposalPage() {
     try {
       const body: Record<string, unknown> = { title, question, type };
       if (type === "vote") {
-        body.options = options.map(o => ({
-          id: o.id.trim(),
-          label: o.label.trim(),
-          earn_pct: Number(o.earn_pct),
-          burn_pct: Number(o.burn_pct),
-        }));
+        body.options = options.map(o => o.trim());
         body.duration_hours = durationHours;
       }
       const res = await authFetch("/api/gov", authData, {
@@ -203,55 +193,24 @@ export default function CreateProposalPage() {
                 <label className="label">
                   <span className="label-text">Vote Options</span>
                 </label>
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {options.map((opt, idx) => (
-                    <div key={idx} className="bg-base-300 p-3 space-y-2">
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          className="input input-bordered input-sm rounded-none flex-1"
-                          placeholder="ID (e.g. 1mo)"
-                          value={opt.id}
-                          onChange={e => updateOption(idx, "id", e.target.value)}
-                        />
-                        <input
-                          type="text"
-                          className="input input-bordered input-sm rounded-none flex-[2]"
-                          placeholder="Label (e.g. 1 month lockup)"
-                          value={opt.label}
-                          onChange={e => updateOption(idx, "label", e.target.value)}
-                        />
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-sm rounded-none text-error"
-                          onClick={() => removeOption(idx)}
-                          disabled={options.length <= 2}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                      <div className="flex gap-2">
-                        <div className="flex items-center gap-1 flex-1">
-                          <span className="text-xs text-success">Earn %</span>
-                          <input
-                            type="number"
-                            step="0.1"
-                            className="input input-bordered input-sm rounded-none w-20"
-                            value={opt.earn_pct}
-                            onChange={e => updateOption(idx, "earn_pct", parseFloat(e.target.value) || 0)}
-                          />
-                        </div>
-                        <div className="flex items-center gap-1 flex-1">
-                          <span className="text-xs text-error">Burn %</span>
-                          <input
-                            type="number"
-                            step="0.1"
-                            className="input input-bordered input-sm rounded-none w-20"
-                            value={opt.burn_pct}
-                            onChange={e => updateOption(idx, "burn_pct", parseFloat(e.target.value) || 0)}
-                          />
-                        </div>
-                      </div>
+                    <div key={idx} className="flex gap-2">
+                      <input
+                        type="text"
+                        className="input input-bordered input-sm rounded-none flex-1"
+                        placeholder="Option text"
+                        value={opt}
+                        onChange={e => updateOption(idx, e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm rounded-none text-error"
+                        onClick={() => removeOption(idx)}
+                        disabled={options.length <= 2}
+                      >
+                        ✕
+                      </button>
                     </div>
                   ))}
                 </div>

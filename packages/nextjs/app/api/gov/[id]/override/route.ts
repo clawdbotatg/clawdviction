@@ -42,9 +42,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       if (!chosen_option) {
         return NextResponse.json({ error: "chosen_option required" }, { status: 400 });
       }
-      const validIds = (options as { id: string }[]).map(o => o.id);
-      if (!validIds.includes(chosen_option)) {
-        return NextResponse.json({ error: `Invalid option. Valid: ${validIds.join(", ")}` }, { status: 400 });
+      const validOptions = options as string[];
+      if (!validOptions.includes(chosen_option)) {
+        return NextResponse.json({ error: `Invalid option. Valid: ${validOptions.join(", ")}` }, { status: 400 });
       }
 
       // Update human_override with chosen option, optionally update cv_committed

@@ -9,13 +9,6 @@ import { authFetch } from "~~/lib/authFetch";
 
 const ADMIN_WALLET = "0x11ce532845ce0eacda41f72fdc1c88c335981442";
 
-interface VoteOption {
-  id: string;
-  label: string;
-  earn_pct: number;
-  burn_pct: number;
-}
-
 interface ProposalData {
   proposal: {
     id: number;
@@ -27,7 +20,7 @@ interface ProposalData {
     status: string;
     aggregated_opinion?: string | null;
     aggregated_opinion_short?: string | null;
-    options?: VoteOption[] | null;
+    options?: string[] | null;
     closes_at?: string | null;
     duration_hours?: number | null;
   };
@@ -217,12 +210,10 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
             {/* Show options summary for multi-option votes */}
             {isMultiOptionVote && (
               <div className="mt-4 space-y-2">
-                {proposal.options!.map(opt => (
-                  <div key={opt.id} className="flex items-center gap-3 text-sm bg-base-300 px-3 py-2">
-                    <span className="font-mono font-bold min-w-[3rem]">{opt.id}</span>
-                    <span className="flex-1">{opt.label}</span>
-                    <span className="text-success">{opt.earn_pct}% earn</span>
-                    <span className="text-error">{opt.burn_pct}% burn</span>
+                {proposal.options!.map((opt, idx) => (
+                  <div key={idx} className="flex items-center gap-3 text-sm bg-base-300 px-3 py-2">
+                    <span className="font-mono font-bold min-w-[1.5rem]">{idx + 1}.</span>
+                    <span className="flex-1">{opt}</span>
                   </div>
                 ))}
               </div>
@@ -331,18 +322,15 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
             <div className="card-body">
               <h2 className="text-lg font-semibold mb-3">Vote Tallies</h2>
               {proposal.options!.map((opt, idx) => {
-                const count = tallies[opt.id] || 0;
-                const cv = cvTotals?.[opt.id] || 0;
+                const count = tallies[opt] || 0;
+                const cv = cvTotals?.[opt] || 0;
                 const pct = totalVotes > 0 ? (count / totalVotes) * 100 : 0;
                 const colors = ["bg-primary", "bg-secondary", "bg-accent", "bg-info", "bg-success", "bg-warning"];
                 const barColor = colors[idx % colors.length];
                 return (
-                  <div key={opt.id} className="mb-3">
+                  <div key={idx} className="mb-3">
                     <div className="flex justify-between text-sm mb-1">
-                      <span>
-                        <span className="font-bold">{opt.label}</span>
-                        <span className="text-base-content/50 ml-1">({opt.id})</span>
-                      </span>
+                      <span className="font-bold">{opt}</span>
                       <span>
                         {count} vote{count !== 1 ? "s" : ""} · {cv.toLocaleString()} CV ({pct.toFixed(1)}%)
                       </span>
@@ -523,31 +511,21 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
                     <div className="mt-4">
                       <p className="text-sm font-semibold mb-2">Override your larva&apos;s vote:</p>
                       <div className="space-y-2 mb-3">
-                        {proposal.options!.map(opt => {
+                        {proposal.options!.map((opt, idx) => {
                           const effectiveChoice = userResponse.human_override || userResponse.chosen_option;
-                          const isSelected =
-                            selectedOption === opt.id || (!selectedOption && effectiveChoice === opt.id);
+                          const isSelected = selectedOption === opt || (!selectedOption && effectiveChoice === opt);
                           return (
                             <button
-                              key={opt.id}
+                              key={idx}
                               className={`w-full text-left px-4 py-3 border transition-all ${
                                 isSelected
                                   ? "border-primary bg-primary/10"
                                   : "border-base-content/20 hover:border-base-content/40"
                               }`}
                               disabled={overrideLoading}
-                              onClick={() => setSelectedOption(opt.id)}
+                              onClick={() => setSelectedOption(opt)}
                             >
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <span className="font-bold">{opt.label}</span>
-                                  <span className="text-base-content/50 ml-2 text-sm">({opt.id})</span>
-                                </div>
-                                <div className="text-sm">
-                                  <span className="text-success mr-3">{opt.earn_pct}% earn</span>
-                                  <span className="text-error">{opt.burn_pct}% burn</span>
-                                </div>
-                              </div>
+                              <span className="font-bold">{opt}</span>
                             </button>
                           );
                         })}

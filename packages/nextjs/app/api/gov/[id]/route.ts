@@ -54,12 +54,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             GROUP BY effective_option`;
           tallies = {} as Record<string, number>;
           cvTotals = {} as Record<string, number>;
-          for (const opt of proposal.options as { id: string }[]) {
-            tallies[opt.id] = 0;
-            cvTotals[opt.id] = 0;
+          for (const opt of proposal.options as string[]) {
+            tallies[opt] = 0;
+            cvTotals[opt] = 0;
           }
           for (const row of tallyResult.rows) {
-            const key = (row.effective_option || "").toLowerCase().trim();
+            const key = (row.effective_option || "").trim();
             if (key in tallies) {
               tallies[key] = row.count;
               cvTotals[key] = Number(row.cv_total);

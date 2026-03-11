@@ -2,13 +2,6 @@ import { compressMemory, sql } from "~~/lib/db";
 import { LARVA_BASE_PROMPT } from "~~/lib/larvaContext";
 import { formatAnswersAsQA } from "~~/lib/questions";
 
-export interface VoteOption {
-  id: string;
-  label: string;
-  earn_pct: number;
-  burn_pct: number;
-}
-
 export interface QueueItem {
   id: number;
   proposal_id: number;
@@ -16,7 +9,7 @@ export interface QueueItem {
   type: string;
   title: string;
   question: string;
-  options: VoteOption[] | null;
+  options: string[] | null;
 }
 
 export async function processQueueItem(item: QueueItem, apiKey: string): Promise<{ wallet: string; response: string }> {
@@ -86,11 +79,8 @@ export async function processQueueItem(item: QueueItem, apiKey: string): Promise
   let userMessage: string;
   if (item.type === "vote" && item.options && item.options.length > 0) {
     // Multi-option vote
-    const optionLines = item.options
-      .map(o => `- ${o.id}: ${o.label} (${o.earn_pct}% earn, ${o.burn_pct}% burned)`)
-      .join("\n");
-    const validIds = item.options.map(o => o.id).join('", "');
-    userMessage = `GOVERNANCE VOTE: "${item.title}"\n\nQuestion: ${item.question}\n\nOptions:\n${optionLines}\n\nBased on everything you know about this holder's values and preferences, respond with ONLY the option ID on the first line (e.g. "${validIds}"), then explain your reasoning on the following lines. Commit 100000 CV to this vote.`;
+    const optionLines = item.options.map((o, i) => `${i + 1}. ${o}`).join("\n");
+    userMessage = `GOVERNANCE VOTE: "${item.title}"\n\nQuestion: ${item.question}\n\nOptions:\n${optionLines}\n\nBased on everything you know about this holder's values and preferences, respond with ONLY the option number (${item.options.map((_, i) => i + 1).join(", ")}) on the first line, then explain your reasoning on the following lines. Commit 100000 CV to this vote.`;
   } else if (item.type === "vote") {
     // Legacy yes/no/abstain vote (no options)
     userMessage = `GOVERNANCE VOTE: "${item.title}"\n\nQuestion: ${item.question}\n\nBased on everything you know about this holder's values and preferences, respond with ONLY "yes", "no", or "abstain" on the first line, then explain your reasoning on the following lines.`;
@@ -125,20 +115,16 @@ export async function processQueueItem(item: QueueItem, apiKey: string): Promise
   let cvCommitted: number | null = null;
 
   if (item.type === "vote" && item.options && item.options.length > 0) {
-    // Multi-option vote: parse the chosen option ID from the first line
+    // Multi-option vote: parse the chosen option number from the first line
     const lines = text.trim().split("\n");
-    const firstLine = lines[0]
-      .toLowerCase()
-      .replace(/[^a-z0-9_-]/g, "")
-      .trim();
-    const validIds = item.options.map(o => o.id.toLowerCase());
+    const firstLine = lines[0].trim();
+    const match = firstLine.match(/(\d+)/);
+    const optionNum = match ? parseInt(match[1]) : 0;
 
-    // Try exact match first, then substring match
-    if (validIds.includes(firstLine)) {
-      chosenOption = item.options[validIds.indexOf(firstLine)].id;
+    if (optionNum >= 1 && optionNum <= item.options.length) {
+      chosenOption = item.options[optionNum - 1];
     } else {
-      const found = validIds.find(vid => firstLine.includes(vid));
-      chosenOption = found ? item.options[validIds.indexOf(found)].id : item.options[0].id;
+      chosenOption = item.options[0];
     }
 
     responseText = chosenOption;
