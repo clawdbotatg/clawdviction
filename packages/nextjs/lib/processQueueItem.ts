@@ -80,7 +80,7 @@ export async function processQueueItem(item: QueueItem, apiKey: string): Promise
   if (item.type === "vote" && item.options && item.options.length > 0) {
     // Multi-option vote
     const optionLines = item.options.map((o, i) => `${i + 1}. ${o}`).join("\n");
-    userMessage = `GOVERNANCE VOTE: "${item.title}"\n\nQuestion: ${item.question}\n\nOptions:\n${optionLines}\n\nBased on everything you know about this holder's values and preferences, respond with ONLY the option number (${item.options.map((_, i) => i + 1).join(", ")}) on the first line, then explain your reasoning on the following lines. Commit 100000 CV to this vote.`;
+    userMessage = `GOVERNANCE VOTE: "${item.title}"\n\nQuestion: ${item.question}\n\nVote Options:\n${optionLines}\n\nYou are voting on behalf of this holder based on everything you know about their values and preferences.\n\nFirst, explain your reasoning in 2-3 sentences. Then on the final line, write: VOTE: [number]\n\nExample final line: VOTE: 3`;
   } else if (item.type === "vote") {
     // Legacy yes/no/abstain vote (no options)
     userMessage = `GOVERNANCE VOTE: "${item.title}"\n\nQuestion: ${item.question}\n\nBased on everything you know about this holder's values and preferences, respond with ONLY "yes", "no", or "abstain" on the first line, then explain your reasoning on the following lines.`;
@@ -97,7 +97,7 @@ export async function processQueueItem(item: QueueItem, apiKey: string): Promise
     },
     body: JSON.stringify({
       model: "zai-org-glm-5",
-      max_tokens: 400,
+      max_tokens: 800,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
@@ -115,11 +115,24 @@ export async function processQueueItem(item: QueueItem, apiKey: string): Promise
   let cvCommitted: number | null = null;
 
   if (item.type === "vote" && item.options && item.options.length > 0) {
-    // Multi-option vote: parse the chosen option number from the first line
-    const lines = text.trim().split("\n");
-    const firstLine = lines[0].trim();
-    const match = firstLine.match(/(\d+)/);
-    const optionNum = match ? parseInt(match[1]) : 0;
+    // Multi-option vote: look for VOTE: N pattern anywhere in response
+    const voteMatch = text.match(/VOTE:\s*(\d+)/i);
+    let optionNum = 0;
+
+    if (voteMatch) {
+      optionNum = parseInt(voteMatch[1]);
+      // Extract reasoning: everything before the VOTE line
+      const voteLineIdx = text.lastIndexOf(voteMatch[0]);
+      reasoning = text.slice(0, voteLineIdx).trim() || null;
+    } else {
+      // Fallback: find any standalone digit 1-N
+      const digitPattern = new RegExp(`\\b([1-${item.options.length}])\\b`);
+      const digitMatch = text.match(digitPattern);
+      if (digitMatch) {
+        optionNum = parseInt(digitMatch[1]);
+      }
+      reasoning = text.trim() || null;
+    }
 
     if (optionNum >= 1 && optionNum <= item.options.length) {
       chosenOption = item.options[optionNum - 1];
@@ -128,7 +141,6 @@ export async function processQueueItem(item: QueueItem, apiKey: string): Promise
     }
 
     responseText = chosenOption;
-    reasoning = lines.slice(1).join("\n").trim() || null;
     cvCommitted = 100000;
   } else if (item.type === "vote") {
     // Legacy yes/no/abstain vote
