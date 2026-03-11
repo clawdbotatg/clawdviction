@@ -387,10 +387,31 @@ const StakePage: NextPage = () => {
           <input
             type="number"
             placeholder="Amount to stake"
-            className="input input-bordered rounded-none w-full mb-4"
+            className="input input-bordered rounded-none w-full"
             value={stakeAmount}
             onChange={e => setStakeAmount(e.target.value)}
           />
+          <div className="flex gap-2 mb-4 mt-2">
+            <button
+              className="btn btn-outline btn-xs rounded-none"
+              onClick={() => clawdBalance && setStakeAmount(formatEther(clawdBalance))}
+              disabled={!clawdBalance || clawdBalance <= 0n}
+            >
+              Max
+            </button>
+            <button
+              className="btn btn-outline btn-xs rounded-none"
+              onClick={() => {
+                if (!clawdBalance) return;
+                const keep = parseEther("10000000");
+                const amount = clawdBalance > keep ? clawdBalance - keep : 0n;
+                setStakeAmount(formatEther(amount));
+              }}
+              disabled={!clawdBalance || clawdBalance <= 0n}
+            >
+              All but 10M
+            </button>
+          </div>
 
           {/* USD preview for input amount */}
           {clawdUsdPrice && parsedAmount > 0n && (
