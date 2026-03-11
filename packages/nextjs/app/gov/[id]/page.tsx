@@ -87,7 +87,7 @@ function TimeRemaining({ closesAt }: { closesAt: string }) {
 export default function ProposalDetailPage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
   const params = use(paramsPromise);
   const { address } = useAccount();
-  const { isAuthenticated, authData } = useAuth(address);
+  const { isAuthenticated, authData, signIn, signing } = useAuth(address);
   const [data, setData] = useState<ProposalData | null>(null);
   const [loading, setLoading] = useState(true);
   const [overrideLoading, setOverrideLoading] = useState(false);
@@ -638,11 +638,30 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
         )}
 
         {/* Not connected */}
-        {!isAuthenticated && (
+        {!address && (
           <div className="card rounded-none bg-base-200 shadow-md">
             <div className="card-body items-center text-center">
               <p className="mb-3">Connect your wallet to see your larva&apos;s response</p>
               <RainbowKitCustomConnectButton />
+            </div>
+          </div>
+        )}
+
+        {/* Connected but not signed in */}
+        {address && !isAuthenticated && (
+          <div className="card rounded-none bg-base-200 shadow-md">
+            <div className="card-body items-center text-center">
+              <p className="mb-3">Sign in to see your larva&apos;s response</p>
+              <button className="btn btn-primary rounded-none" disabled={signing} onClick={signIn}>
+                {signing ? (
+                  <>
+                    <span className="loading loading-spinner loading-sm" />
+                    Signing in...
+                  </>
+                ) : (
+                  "Sign In"
+                )}
+              </button>
             </div>
           </div>
         )}
