@@ -94,6 +94,7 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
   const [annotateNote, setAnnotateNote] = useState("");
   const [annotateLoading, setAnnotateLoading] = useState(false);
   const [collectLoading, setCollectLoading] = useState(false);
+  const [collectMissingLoading, setCollectMissingLoading] = useState(false);
   const [refetchLoading, setRefetchLoading] = useState(false);
   const [collectResults, setCollectResults] = useState<{ wallet: string; response: string }[] | null>(null);
   const [aggregateLoading, setAggregateLoading] = useState(false);
@@ -247,11 +248,43 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
                   </button>
                 </>
               ) : (
-                <div className="flex gap-3">
+                <div className="flex gap-3 flex-wrap">
+                  <button
+                    className="btn btn-outline btn-sm rounded-none"
+                    disabled={collectMissingLoading || collectLoading || refetchLoading}
+                    onClick={async () => {
+                      if (!authData) return;
+                      setCollectMissingLoading(true);
+                      try {
+                        const res = await authFetch(`/api/gov/${params.id}/collect`, authData, {
+                          method: "POST",
+                        });
+                        const json = await res.json();
+                        if (json.queued > 0) {
+                          alert(`Queued ${json.queued} new responses`);
+                        } else {
+                          alert("All larvae have already responded");
+                        }
+                        await fetchData();
+                      } catch {
+                        alert("Error collecting responses");
+                      }
+                      setCollectMissingLoading(false);
+                    }}
+                  >
+                    {collectMissingLoading ? (
+                      <>
+                        <span className="loading loading-spinner loading-sm" />
+                        Collecting...
+                      </>
+                    ) : (
+                      "+ Collect Responses"
+                    )}
+                  </button>
                   {pendingCount > 0 && (
                     <button
                       className="btn btn-primary rounded-none"
-                      disabled={collectLoading || refetchLoading}
+                      disabled={collectLoading || refetchLoading || collectMissingLoading}
                       onClick={async () => {
                         if (!authData) return;
                         setCollectLoading(true);
