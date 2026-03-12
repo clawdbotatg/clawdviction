@@ -28,6 +28,11 @@ interface PostData {
   }[];
   larvaResponseCount: number;
   larvaPendingCount: number;
+  larvaResponses: {
+    wallet: string;
+    response: string;
+    created_at: string;
+  }[];
 }
 
 const truncateWallet = (w: string) => `${w.slice(0, 6)}...${w.slice(-4)}`;
@@ -129,7 +134,7 @@ export default function ForumPostPage({ params }: { params: Promise<{ id: string
     );
   }
 
-  const { post, replies, larvaResponseCount, larvaPendingCount } = data;
+  const { post, replies, larvaResponseCount, larvaPendingCount, larvaResponses } = data;
 
   return (
     <div className="flex flex-col items-center min-h-screen pt-10 px-4">
@@ -150,55 +155,6 @@ export default function ForumPostPage({ params }: { params: Promise<{ id: string
             <p className="mt-3 whitespace-pre-wrap">{post.body}</p>
           </div>
         </div>
-
-        {/* Larva Hive-Mind Section */}
-        {post.larva_triggered && (
-          <div className="card rounded-none bg-base-200 shadow-md mb-6">
-            <div className="card-body">
-              <h2 className="text-lg font-bold">🧠 Larva Hive-Mind</h2>
-              {post.aggregated_opinion ? (
-                <div className="mt-2">
-                  {post.aggregated_opinion_short && (
-                    <p className="text-sm font-semibold text-info mb-2">{post.aggregated_opinion_short}</p>
-                  )}
-                  <p className="whitespace-pre-wrap text-sm">{post.aggregated_opinion}</p>
-                </div>
-              ) : (
-                <div className="mt-2">
-                  <p className="text-sm text-base-content/60">
-                    Larvae are processing... ({larvaResponseCount} responded, {larvaPendingCount} pending)
-                  </p>
-                  <span className="loading loading-dots loading-sm mt-2"></span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Trigger Button (OP only, not yet triggered) */}
-        {isOP && !post.larva_triggered && (
-          <div className="card rounded-none bg-base-200 shadow-md mb-6">
-            <div className="card-body">
-              <h2 className="text-lg font-bold">🧠 Larva Hive-Mind</h2>
-              <p className="text-sm text-base-content/60 mt-1">
-                Get an aggregated opinion from all larvae on your post.
-              </p>
-              {isAuthenticated ? (
-                <button className="btn btn-info btn-sm mt-2 w-fit" onClick={handleTrigger} disabled={triggering}>
-                  {triggering ? (
-                    <span className="loading loading-spinner loading-xs"></span>
-                  ) : (
-                    "Trigger Larva Response (1M CV)"
-                  )}
-                </button>
-              ) : (
-                <button className="btn btn-outline btn-sm mt-2 w-fit" onClick={signIn} disabled={signing}>
-                  {signing ? "Signing..." : "Sign in to trigger"}
-                </button>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* Replies */}
         <div className="mb-6">
@@ -262,6 +218,55 @@ export default function ForumPostPage({ params }: { params: Promise<{ id: string
             {error && <p className="text-error text-sm mt-2">{error}</p>}
           </div>
         </div>
+
+        {/* Larva Hive-Mind Section */}
+        {post.larva_triggered && (
+          <div className="card rounded-none bg-base-200 shadow-md mb-6">
+            <div className="card-body">
+              <h2 className="text-lg font-bold">🧠 Larva Hive-Mind</h2>
+              {post.aggregated_opinion ? (
+                <div className="mt-2">
+                  {post.aggregated_opinion_short && (
+                    <p className="text-sm font-semibold text-info mb-2">{post.aggregated_opinion_short}</p>
+                  )}
+                  <p className="whitespace-pre-wrap text-sm">{post.aggregated_opinion}</p>
+                </div>
+              ) : (
+                <div className="mt-2">
+                  <p className="text-sm text-base-content/60">
+                    Larvae are processing... ({larvaResponseCount} responded, {larvaPendingCount} pending)
+                  </p>
+                  <span className="loading loading-dots loading-sm mt-2"></span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Trigger Button (OP only, not yet triggered) */}
+        {isOP && !post.larva_triggered && (
+          <div className="card rounded-none bg-base-200 shadow-md mb-6">
+            <div className="card-body">
+              <h2 className="text-lg font-bold">🧠 Larva Hive-Mind</h2>
+              <p className="text-sm text-base-content/60 mt-1">
+                Get an aggregated opinion from all larvae on your post.
+              </p>
+              {isAuthenticated ? (
+                <button className="btn btn-info btn-sm mt-2 w-fit" onClick={handleTrigger} disabled={triggering}>
+                  {triggering ? (
+                    <span className="loading loading-spinner loading-xs"></span>
+                  ) : (
+                    "Trigger Larva Response (1M CV)"
+                  )}
+                </button>
+              ) : (
+                <button className="btn btn-outline btn-sm mt-2 w-fit" onClick={signIn} disabled={signing}>
+                  {signing ? "Signing..." : "Sign in to trigger"}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

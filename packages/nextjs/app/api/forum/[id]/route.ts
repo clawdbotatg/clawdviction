@@ -28,11 +28,22 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     const pendingCount = await sql`
       SELECT COUNT(*)::int as count FROM forum_queue WHERE post_id = ${id} AND status = 'pending'`;
 
+    const larvaResponses = postResult.rows[0].larva_triggered
+      ? (
+          await sql`
+          SELECT wallet, response, created_at
+          FROM forum_responses
+          WHERE post_id = ${id}
+          ORDER BY created_at ASC`
+        ).rows
+      : [];
+
     return NextResponse.json({
       post: postResult.rows[0],
       replies: replies.rows,
       larvaResponseCount: larvaCount.rows[0].count,
       larvaPendingCount: pendingCount.rows[0].count,
+      larvaResponses,
     });
   } catch (error) {
     console.error("GET /api/forum/[id] error:", error);
