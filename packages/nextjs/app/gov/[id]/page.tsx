@@ -350,40 +350,80 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
         )}
 
         {/* Vote Tallies — Multi-option */}
-        {isMultiOptionVote && tallies && totalVotes > 0 && (
-          <div className="card rounded-none bg-base-200 shadow-md mb-6">
-            <div className="card-body">
-              <h2 className="text-lg font-semibold mb-3">
-                {proposal.closes_at && new Date(proposal.closes_at).getTime() < Date.now()
-                  ? "📊 Final Results"
-                  : "📊 Vote Tallies"}
-              </h2>
-              {proposal.options!.map((opt, idx) => {
-                const count = tallies[opt] || 0;
-                const cv = cvTotals?.[opt] || 0;
-                const pct = totalVotes > 0 ? (count / totalVotes) * 100 : 0;
-                const colors = ["bg-primary", "bg-secondary", "bg-accent", "bg-info", "bg-success", "bg-warning"];
-                const barColor = colors[idx % colors.length];
-                return (
-                  <div key={idx} className="mb-3">
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="font-bold">{opt}</span>
-                      <span>
-                        {count} vote{count !== 1 ? "s" : ""} · {cv.toLocaleString()} CV ({pct.toFixed(1)}%)
-                      </span>
+        {isMultiOptionVote &&
+          tallies &&
+          totalVotes > 0 &&
+          (() => {
+            const isClosed = proposal.closes_at && new Date(proposal.closes_at).getTime() < Date.now();
+            const cvWinnerOpt = proposal.options!.reduce(
+              (best, opt) => ((cvTotals?.[opt] || 0) > (cvTotals?.[best] || 0) ? opt : best),
+              proposal.options![0],
+            );
+            const voteWinnerOpt = proposal.options!.reduce(
+              (best, opt) => ((tallies[opt] || 0) > (tallies[best] || 0) ? opt : best),
+              proposal.options![0],
+            );
+            const cvWinnerCv = cvTotals?.[cvWinnerOpt] || 0;
+            const cvWinnerPct = totalCv > 0 ? ((cvWinnerCv / totalCv) * 100).toFixed(1) : "0.0";
+            const voteWinnerCount = tallies[voteWinnerOpt] || 0;
+            const voteWinnerPct = totalVotes > 0 ? ((voteWinnerCount / totalVotes) * 100).toFixed(1) : "0.0";
+            const sameWinner = cvWinnerOpt === voteWinnerOpt;
+
+            return (
+              <div className="card rounded-none bg-base-200 shadow-md mb-6">
+                <div className="card-body">
+                  <h2 className="text-lg font-semibold mb-3">{isClosed ? "📊 Final Results" : "📊 Vote Tallies"}</h2>
+
+                  {/* Winner declaration */}
+                  {isClosed && totalVotes > 0 && (
+                    <div className="mb-4 p-3 bg-base-300 border-l-4 border-primary">
+                      <p className="font-bold">
+                        🏆 {sameWinner ? "Winner" : "CV Winner"}: &ldquo;{cvWinnerOpt}&rdquo; —{" "}
+                        {cvWinnerCv.toLocaleString()} CV ({cvWinnerPct}%)
+                      </p>
+                      {!sameWinner && (
+                        <p className="text-sm mt-1">
+                          📊 Vote count winner: &ldquo;{voteWinnerOpt}&rdquo; — {voteWinnerCount} vote
+                          {voteWinnerCount !== 1 ? "s" : ""} ({voteWinnerPct}%)
+                        </p>
+                      )}
                     </div>
-                    <div className="w-full bg-base-300 h-4">
-                      <div className={`${barColor} h-4 transition-all`} style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
-              {totalCv > 0 && (
-                <p className="text-sm text-base-content/50 mt-2">Total CV committed: {totalCv.toLocaleString()}</p>
-              )}
-            </div>
-          </div>
-        )}
+                  )}
+
+                  {proposal.options!.map((opt, idx) => {
+                    const count = tallies[opt] || 0;
+                    const cv = cvTotals?.[opt] || 0;
+                    const votePct = totalVotes > 0 ? (count / totalVotes) * 100 : 0;
+                    const cvPct = totalCv > 0 ? (cv / totalCv) * 100 : 0;
+                    const colors = ["bg-primary", "bg-secondary", "bg-accent", "bg-info", "bg-success", "bg-warning"];
+                    const barColor = colors[idx % colors.length];
+                    return (
+                      <div key={idx} className="mb-3">
+                        <div className="text-sm mb-1">
+                          <span className="font-bold">{opt}</span>
+                          <div className="flex gap-3 text-base-content/70">
+                            <span>
+                              {count} vote{count !== 1 ? "s" : ""} ({votePct.toFixed(1)}%)
+                            </span>
+                            <span>·</span>
+                            <span>
+                              {cv.toLocaleString()} CV ({cvPct.toFixed(1)}%)
+                            </span>
+                          </div>
+                        </div>
+                        <div className="w-full bg-base-300 h-4">
+                          <div className={`${barColor} h-4 transition-all`} style={{ width: `${cvPct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {totalCv > 0 && (
+                    <p className="text-sm text-base-content/50 mt-2">Total CV committed: {totalCv.toLocaleString()}</p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
         {/* Vote Tallies — Legacy yes/no/abstain */}
         {isLegacyVote && tallies && totalVotes > 0 && (
