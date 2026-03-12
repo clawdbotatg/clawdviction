@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAccount } from "wagmi";
-import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
+import { Address, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useAuth } from "~~/hooks/useAuth";
 import { authFetch } from "~~/lib/authFetch";
 
@@ -34,8 +34,6 @@ interface PostData {
     created_at: string;
   }[];
 }
-
-const truncateWallet = (w: string) => `${w.slice(0, 6)}...${w.slice(-4)}`;
 
 const timeAgo = (dateStr: string) => {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -149,7 +147,9 @@ export default function ForumPostPage({ params }: { params: Promise<{ id: string
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               <span className="badge badge-sm badge-accent">{post.cv_burned.toLocaleString()} CV burned</span>
               <span className="text-xs text-base-content/50">{timeAgo(post.created_at)}</span>
-              <span className="text-xs text-base-content/50">by {truncateWallet(post.wallet)}</span>
+              <span className="text-xs text-base-content/50 inline-flex items-center gap-1">
+                by <Address address={post.wallet} size="xs" />
+              </span>
             </div>
             <h1 className="text-2xl font-bold">{post.title}</h1>
             <p className="mt-3 whitespace-pre-wrap">{post.body}</p>
@@ -167,7 +167,9 @@ export default function ForumPostPage({ params }: { params: Promise<{ id: string
                 <div key={r.id} className="card rounded-none bg-base-200">
                   <div className="card-body py-3 px-4">
                     <div className="flex items-center gap-2 text-xs text-base-content/50 mb-1">
-                      <span>{truncateWallet(r.wallet)}</span>
+                      <span className="inline-flex items-center">
+                        <Address address={r.wallet} size="xs" />
+                      </span>
                       <span>·</span>
                       <span>{r.cv_burned.toLocaleString()} CV</span>
                       <span>·</span>
@@ -248,7 +250,9 @@ export default function ForumPostPage({ params }: { params: Promise<{ id: string
                       <div key={i} className="card rounded-none bg-base-300">
                         <div className="card-body py-3 px-4">
                           <div className="flex items-center gap-2 text-xs text-base-content/50 mb-1">
-                            <span>{"🐛 " + truncateWallet(lr.wallet)}</span>
+                            <span className="inline-flex items-center gap-1">
+                              🐛 <Address address={lr.wallet} size="xs" />
+                            </span>
                             <span>·</span>
                             <span>{timeAgo(lr.created_at)}</span>
                           </div>

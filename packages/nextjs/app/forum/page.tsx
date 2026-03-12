@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
+import { Address } from "~~/components/scaffold-eth";
 
 interface ForumPost {
   id: number;
@@ -30,8 +31,6 @@ const ForumPage: NextPage = () => {
       })
       .catch(() => setLoading(false));
   }, []);
-
-  const truncateWallet = (w: string) => `${w.slice(0, 6)}...${w.slice(-4)}`;
 
   const timeAgo = (dateStr: string) => {
     const diff = Date.now() - new Date(dateStr).getTime();
@@ -72,8 +71,9 @@ const ForumPage: NextPage = () => {
                         <span className="text-xs text-base-content/50">{timeAgo(p.created_at)}</span>
                       </div>
                       <h2 className="text-lg font-semibold">{p.title}</h2>
-                      <p className="text-sm text-base-content/60 mt-1">
-                        {truncateWallet(p.wallet)} · {p.reply_count} repl{p.reply_count !== 1 ? "ies" : "y"}
+                      <p className="text-sm text-base-content/60 mt-1 flex items-center gap-1">
+                        <Address address={p.wallet} size="xs" /> · {p.reply_count} repl
+                        {p.reply_count !== 1 ? "ies" : "y"}
                       </p>
                       {p.aggregated_opinion_short && (
                         <p className="text-xs text-info mt-1 italic">🧠 {p.aggregated_opinion_short}</p>
