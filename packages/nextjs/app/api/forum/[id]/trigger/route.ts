@@ -24,7 +24,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (post.rows.length === 0) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
-    if (post.rows[0].wallet !== wallet) {
+    if (post.rows[0].wallet.toLowerCase() !== wallet.toLowerCase()) {
       return NextResponse.json({ error: "Only the post author can trigger larva responses" }, { status: 403 });
     }
     if (post.rows[0].larva_triggered) {

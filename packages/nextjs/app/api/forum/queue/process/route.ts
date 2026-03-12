@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processForumQueue } from "~~/lib/forumQueue";
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function POST(_request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    // No auth required — CV payment at trigger time is the authorization
+    const authHeader = request.headers.get("authorization");
+    const secret = process.env.CRON_SECRET;
+    if (!secret || authHeader !== `Bearer ${secret}`) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { processed, results } = await processForumQueue(10);
     return NextResponse.json({ processed, results });
   } catch (error) {

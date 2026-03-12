@@ -15,16 +15,36 @@ export async function processForumQueue(
 
   await initDb();
 
-  const pending = await sql`
-    SELECT q.id, q.post_id, q.wallet, p.title, p.body
-    FROM forum_queue q
-    JOIN forum_posts p ON p.id = q.post_id
-    WHERE q.status = 'pending'
-    ORDER BY q.created_at ASC
-    LIMIT ${limit}`;
+  // Atomically claim pending rows — prevents race conditions with concurrent calls
+  const claimed = await sql`
+    UPDATE forum_queue
+    SET status = 'processing'
+    WHERE id IN (
+      SELECT id FROM forum_queue
+      WHERE status = 'pending'
+      ORDER BY created_at ASC
+      LIMIT ${limit}
+      FOR UPDATE SKIP LOCKED
+    )
+    RETURNING id, post_id, wallet`;
 
-  if (pending.rows.length === 0) {
+  if (claimed.rows.length === 0) {
     return { processed: 0, results: [] };
+  }
+
+  // Fetch post details for each claimed row
+  const pending: { rows: { id: number; post_id: number; wallet: string; title: string; body: string }[] } = {
+    rows: [],
+  };
+  for (const row of claimed.rows) {
+    const post = await sql`SELECT title, body FROM forum_posts WHERE id = ${row.post_id}`;
+    pending.rows.push({
+      id: row.id,
+      post_id: row.post_id,
+      wallet: row.wallet,
+      title: post.rows[0]?.title || "",
+      body: post.rows[0]?.body || "",
+    });
   }
 
   const results: { wallet: string; response: string }[] = [];
@@ -32,8 +52,6 @@ export async function processForumQueue(
 
   for (const item of pending.rows) {
     try {
-      await sql`UPDATE forum_queue SET status = 'processing' WHERE id = ${item.id}`;
-
       const walletLower = item.wallet.toLowerCase();
 
       // Ensure memory snapshot exists
