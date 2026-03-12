@@ -39,6 +39,7 @@ interface ProposalData {
   }[];
   tallies?: Record<string, number>;
   cvTotals?: Record<string, number>;
+  quadraticTotals?: Record<string, number>;
   userResponse?: {
     response: string;
     reasoning: string | null;
@@ -179,11 +180,22 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
     return <div className="text-center py-20">Proposal not found.</div>;
   }
 
-  const { proposal, responseCount, pendingCount, responses, tallies, cvTotals, userResponse, queueStatus } = data;
+  const {
+    proposal,
+    responseCount,
+    pendingCount,
+    responses,
+    tallies,
+    cvTotals,
+    quadraticTotals,
+    userResponse,
+    queueStatus,
+  } = data;
 
   // Compute total votes for bar widths
   const totalVotes = tallies ? Object.values(tallies).reduce((a, b) => a + b, 0) : 0;
   const totalCv = cvTotals ? Object.values(cvTotals).reduce((a, b) => a + b, 0) : 0;
+  const totalQp = quadraticTotals ? Object.values(quadraticTotals).reduce((a, b) => a + b, 0) : 0;
 
   return (
     <div className="flex flex-col items-center min-h-screen pt-10 px-4">
@@ -355,19 +367,12 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
           totalVotes > 0 &&
           (() => {
             const isClosed = proposal.closes_at && new Date(proposal.closes_at).getTime() < Date.now();
-            const cvWinnerOpt = proposal.options!.reduce(
-              (best, opt) => ((cvTotals?.[opt] || 0) > (cvTotals?.[best] || 0) ? opt : best),
+            const qpWinnerOpt = proposal.options!.reduce(
+              (best, opt) => ((quadraticTotals?.[opt] || 0) > (quadraticTotals?.[best] || 0) ? opt : best),
               proposal.options![0],
             );
-            const voteWinnerOpt = proposal.options!.reduce(
-              (best, opt) => ((tallies[opt] || 0) > (tallies[best] || 0) ? opt : best),
-              proposal.options![0],
-            );
-            const cvWinnerCv = cvTotals?.[cvWinnerOpt] || 0;
-            const cvWinnerPct = totalCv > 0 ? ((cvWinnerCv / totalCv) * 100).toFixed(1) : "0.0";
-            const voteWinnerCount = tallies[voteWinnerOpt] || 0;
-            const voteWinnerPct = totalVotes > 0 ? ((voteWinnerCount / totalVotes) * 100).toFixed(1) : "0.0";
-            const sameWinner = cvWinnerOpt === voteWinnerOpt;
+            const qpWinnerQp = quadraticTotals?.[qpWinnerOpt] || 0;
+            const qpWinnerPct = totalQp > 0 ? ((qpWinnerQp / totalQp) * 100).toFixed(1) : "0.0";
 
             return (
               <div className="card rounded-none bg-base-200 shadow-md mb-6">
@@ -378,47 +383,54 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
                   {isClosed && totalVotes > 0 && (
                     <div className="mb-4 p-3 bg-base-300 border-l-4 border-primary">
                       <p className="font-bold">
-                        🏆 {sameWinner ? "Winner" : "CV Winner"}: &ldquo;{cvWinnerOpt}&rdquo; —{" "}
-                        {cvWinnerCv.toLocaleString()} CV ({cvWinnerPct}%)
+                        🏆 Winner: &ldquo;{qpWinnerOpt}&rdquo; — {Math.round(qpWinnerQp).toLocaleString()} QP (
+                        {qpWinnerPct}%)
                       </p>
-                      {!sameWinner && (
-                        <p className="text-sm mt-1">
-                          📊 Vote count winner: &ldquo;{voteWinnerOpt}&rdquo; — {voteWinnerCount} vote
-                          {voteWinnerCount !== 1 ? "s" : ""} ({voteWinnerPct}%)
-                        </p>
-                      )}
+                      <p
+                        className="text-xs text-base-content/50 mt-1"
+                        title="QP = √CV per voter, summed — reduces whale dominance"
+                      >
+                        QP = √CV per voter, summed — reduces whale dominance
+                      </p>
                     </div>
                   )}
 
                   {proposal.options!.map((opt, idx) => {
                     const count = tallies[opt] || 0;
                     const cv = cvTotals?.[opt] || 0;
-                    const votePct = totalVotes > 0 ? (count / totalVotes) * 100 : 0;
-                    const cvPct = totalCv > 0 ? (cv / totalCv) * 100 : 0;
+                    const qp = quadraticTotals?.[opt] || 0;
+                    const qpPct = totalQp > 0 ? (qp / totalQp) * 100 : 0;
                     const colors = ["bg-primary", "bg-secondary", "bg-accent", "bg-info", "bg-success", "bg-warning"];
                     const barColor = colors[idx % colors.length];
                     return (
                       <div key={idx} className="mb-3">
                         <div className="text-sm mb-1">
                           <span className="font-bold">{opt}</span>
-                          <div className="flex gap-3 text-base-content/70">
+                          <div className="flex gap-3 text-base-content/70 flex-wrap">
                             <span>
-                              {count} vote{count !== 1 ? "s" : ""} ({votePct.toFixed(1)}%)
+                              {count} vote{count !== 1 ? "s" : ""}
                             </span>
                             <span>·</span>
+                            <span>{cv.toLocaleString()} CV</span>
+                            <span>·</span>
                             <span>
-                              {cv.toLocaleString()} CV ({cvPct.toFixed(1)}%)
+                              ⚡ {Math.round(qp).toLocaleString()} QP ({qpPct.toFixed(1)}%)
                             </span>
                           </div>
                         </div>
                         <div className="w-full bg-base-300 h-4">
-                          <div className={`${barColor} h-4 transition-all`} style={{ width: `${cvPct}%` }} />
+                          <div className={`${barColor} h-4 transition-all`} style={{ width: `${qpPct}%` }} />
                         </div>
                       </div>
                     );
                   })}
-                  {totalCv > 0 && (
-                    <p className="text-sm text-base-content/50 mt-2">Total CV committed: {totalCv.toLocaleString()}</p>
+                  {totalQp > 0 && (
+                    <p
+                      className="text-sm text-base-content/50 mt-2"
+                      title="QP = √CV per voter, summed — reduces whale dominance"
+                    >
+                      Total: {totalCv.toLocaleString()} CV · {Math.round(totalQp).toLocaleString()} QP
+                    </p>
                   )}
                 </div>
               </div>

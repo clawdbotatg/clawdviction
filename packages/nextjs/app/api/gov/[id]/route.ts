@@ -31,26 +31,31 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // Compute vote tallies for all users (public data)
     let tallies = null;
     let cvTotals = null;
+    let quadraticTotals = null;
     if (proposal.type === "vote") {
       if (proposal.options && Array.isArray(proposal.options)) {
         const tallyResult = await sql`
           SELECT COALESCE(human_override, chosen_option, response) as effective_option,
                  COUNT(*)::int as count,
-                 COALESCE(SUM(cv_committed), 0)::bigint as cv_total
+                 COALESCE(SUM(cv_committed), 0)::bigint as cv_total,
+                 ROUND(COALESCE(SUM(SQRT(cv_committed::float)), 0)::numeric, 2) as quadratic_power
           FROM governance_responses
           WHERE proposal_id = ${id}
           GROUP BY effective_option`;
         tallies = {} as Record<string, number>;
         cvTotals = {} as Record<string, number>;
+        quadraticTotals = {} as Record<string, number>;
         for (const opt of proposal.options as string[]) {
           tallies[opt] = 0;
           cvTotals[opt] = 0;
+          quadraticTotals[opt] = 0;
         }
         for (const row of tallyResult.rows) {
           const key = (row.effective_option || "").trim();
           if (key in tallies) {
             tallies[key] = row.count;
             cvTotals[key] = Number(row.cv_total);
+            quadraticTotals[key] = Number(row.quadratic_power);
           }
         }
       } else {
@@ -78,7 +83,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         WHERE gr.proposal_id = ${id}
         ORDER BY cv_balance DESC`;
 
-      return NextResponse.json({ proposal, responseCount, pendingCount, responses: responses.rows, tallies, cvTotals });
+      return NextResponse.json({
+        proposal,
+        responseCount,
+        pendingCount,
+        responses: responses.rows,
+        tallies,
+        cvTotals,
+        quadraticTotals,
+      });
     } else if (wallet) {
       // Regular user: their response + queue status
       const userResponse = await sql`
@@ -98,13 +111,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         pendingCount,
         tallies,
         cvTotals,
+        quadraticTotals,
         userResponse: userResponse.rows[0] || null,
         queueStatus: queueStatus.rows[0]?.status || null,
       });
     }
 
     // Public: proposal + count + tallies
-    return NextResponse.json({ proposal, responseCount, pendingCount, tallies, cvTotals });
+    return NextResponse.json({ proposal, responseCount, pendingCount, tallies, cvTotals, quadraticTotals });
   } catch (error) {
     console.error("GET /api/gov/[id] error:", error);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
