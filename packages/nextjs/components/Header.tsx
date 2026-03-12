@@ -29,17 +29,17 @@ export const menuLinks: HeaderMenuLink[] = [
     href: "/stake",
   },
   {
-    label: "Chat",
-    href: "https://t.me/ClawdChatTGBot",
-    external: true,
-  },
-  {
     label: "Gov",
     href: "/gov",
   },
   {
     label: "Forum",
     href: "/forum",
+  },
+  {
+    label: "Chat",
+    href: "https://t.me/ClawdChatTGBot",
+    external: true,
   },
   {
     label: "About",
