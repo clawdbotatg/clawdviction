@@ -31,7 +31,7 @@ export async function aggregateForumPost(postId: number): Promise<{ opinion: str
     })
     .join("\n\n");
 
-  const userPrompt = `Forum Post: "${post.title}"\n\n${post.body}\n\nLarva Perspectives (sorted by CV weight):\n\n${formatted}\n\nSynthesize these perspectives into an aggregated community opinion. Identify themes, consensus, and notable disagreements. Be insightful and direct. 2-4 paragraphs.`;
+  const userPrompt = `Forum Post: "${post.title}"\n\n${post.body}\n\nLarva Perspectives (sorted by CV weight):\n\n${formatted}\n\nSynthesize these perspectives into an aggregated community opinion. Identify themes, consensus, and notable disagreements. Be insightful and direct. 2-4 paragraphs. Do not use markdown formatting — no headers, no bold, no bullet points. Plain prose paragraphs only.`;
 
   // Aggregation call
   const res = await fetch("https://api.anthropic.com/v1/messages", {
