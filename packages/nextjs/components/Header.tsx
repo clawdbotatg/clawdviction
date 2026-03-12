@@ -16,6 +16,7 @@ type HeaderMenuLink = {
   label: string;
   href: string;
   icon?: React.ReactNode;
+  external?: boolean;
 };
 
 export const menuLinks: HeaderMenuLink[] = [
@@ -29,7 +30,8 @@ export const menuLinks: HeaderMenuLink[] = [
   },
   {
     label: "Chat",
-    href: "/chat",
+    href: "https://t.me/ClawdChatTGBot",
+    external: true,
   },
   {
     label: "Gov",
@@ -54,20 +56,24 @@ export const HeaderMenuLinks = () => {
 
   return (
     <>
-      {allLinks.map(({ label, href, icon }) => {
+      {allLinks.map(({ label, href, icon, external }) => {
         const isActive = pathname === href;
+        const className = `${
+          isActive ? "bg-secondary shadow-md" : ""
+        } hover:bg-secondary hover:shadow-md focus:!bg-secondary active:!text-neutral py-1.5 px-3 text-sm rounded-full gap-2 grid grid-flow-col`;
         return (
           <li key={href}>
-            <Link
-              href={href}
-              passHref
-              className={`${
-                isActive ? "bg-secondary shadow-md" : ""
-              } hover:bg-secondary hover:shadow-md focus:!bg-secondary active:!text-neutral py-1.5 px-3 text-sm rounded-full gap-2 grid grid-flow-col`}
-            >
-              {icon}
-              <span>{label}</span>
-            </Link>
+            {external ? (
+              <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
+                {icon}
+                <span>{label}</span>
+              </a>
+            ) : (
+              <Link href={href} passHref className={className}>
+                {icon}
+                <span>{label}</span>
+              </Link>
+            )}
           </li>
         );
       })}
