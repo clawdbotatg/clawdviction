@@ -239,6 +239,29 @@ export default function ForumPostPage({ params }: { params: Promise<{ id: string
                   <span className="loading loading-dots loading-sm mt-2"></span>
                 </div>
               )}
+
+              {larvaResponses.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-base-300">
+                  <h3 className="text-md font-bold mb-3">{"🐛 Larva Perspectives (" + larvaResponses.length + ")"}</h3>
+                  <div className="space-y-2">
+                    {larvaResponses.map((lr, i) => (
+                      <div key={i} className="card rounded-none bg-base-300">
+                        <div className="card-body py-3 px-4">
+                          <div className="flex items-center gap-2 text-xs text-base-content/50 mb-1">
+                            <span>{"🐛 " + truncateWallet(lr.wallet)}</span>
+                            <span>·</span>
+                            <span>{timeAgo(lr.created_at)}</span>
+                          </div>
+                          <p className="text-sm whitespace-pre-wrap">{lr.response}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {larvaPendingCount > 0 && (
+                    <p className="text-sm text-base-content/50 mt-2">{larvaPendingCount + " more processing..."}</p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
