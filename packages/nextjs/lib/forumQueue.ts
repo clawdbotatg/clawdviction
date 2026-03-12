@@ -1,4 +1,5 @@
 import { compressMemory, initDb, sql } from "~~/lib/db";
+import { aggregateForumPost } from "~~/lib/forumAggregate";
 import { formatAnswersAsQA } from "~~/lib/questions";
 
 function buildForumSystemPrompt(
@@ -170,6 +171,19 @@ export async function processForumQueue(
         ON CONFLICT (post_id, wallet) DO UPDATE SET response = ${text}, created_at = NOW()`;
 
       await sql`UPDATE forum_queue SET status = 'done', processed_at = NOW() WHERE id = ${item.id}`;
+
+      // Check if this was the last pending item for this post
+      const remaining = await sql`
+        SELECT COUNT(*) as cnt FROM forum_queue
+        WHERE post_id = ${item.post_id} AND status IN ('pending', 'processing')`;
+      if (parseInt(remaining.rows[0].cnt) === 0) {
+        try {
+          await aggregateForumPost(item.post_id);
+        } catch (e) {
+          console.error(`Auto-aggregate failed for post ${item.post_id}:`, e);
+        }
+      }
+
       results.push({ wallet: item.wallet, response: text });
     } catch (e) {
       console.error(`Forum queue processing error for item ${item.id}:`, e);
