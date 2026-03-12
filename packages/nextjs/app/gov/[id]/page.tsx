@@ -350,10 +350,14 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
         )}
 
         {/* Vote Tallies — Multi-option */}
-        {isAdmin && isAuthenticated && isMultiOptionVote && tallies && totalVotes > 0 && (
+        {isMultiOptionVote && tallies && totalVotes > 0 && (
           <div className="card rounded-none bg-base-200 shadow-md mb-6">
             <div className="card-body">
-              <h2 className="text-lg font-semibold mb-3">Vote Tallies</h2>
+              <h2 className="text-lg font-semibold mb-3">
+                {proposal.closes_at && new Date(proposal.closes_at).getTime() < Date.now()
+                  ? "📊 Final Results"
+                  : "📊 Vote Tallies"}
+              </h2>
               {proposal.options!.map((opt, idx) => {
                 const count = tallies[opt] || 0;
                 const cv = cvTotals?.[opt] || 0;
@@ -382,10 +386,14 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
         )}
 
         {/* Vote Tallies — Legacy yes/no/abstain */}
-        {isAdmin && isAuthenticated && isLegacyVote && tallies && totalVotes > 0 && (
+        {isLegacyVote && tallies && totalVotes > 0 && (
           <div className="card rounded-none bg-base-200 shadow-md mb-6">
             <div className="card-body">
-              <h2 className="text-lg font-semibold mb-3">Vote Tallies</h2>
+              <h2 className="text-lg font-semibold mb-3">
+                {proposal.closes_at && new Date(proposal.closes_at).getTime() < Date.now()
+                  ? "📊 Final Results"
+                  : "📊 Vote Tallies"}
+              </h2>
               {(["yes", "no", "abstain"] as const).map(key => {
                 const count = (tallies as Record<string, number>)[key] || 0;
                 const pct = totalVotes > 0 ? (count / totalVotes) * 100 : 0;
