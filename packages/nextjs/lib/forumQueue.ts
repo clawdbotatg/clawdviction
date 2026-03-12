@@ -1,6 +1,46 @@
 import { compressMemory, initDb, sql } from "~~/lib/db";
-import { LARVA_BASE_PROMPT } from "~~/lib/larvaContext";
 import { formatAnswersAsQA } from "~~/lib/questions";
+
+function buildForumSystemPrompt(
+  wallet: string,
+  onboardingContext: string,
+  memorySnapshot: string,
+  chatContext: string,
+): string {
+  let prompt = `You are a Larva — an AI governance agent that represents a $CLAWD token holder.
+
+You are NOT the holder. You are their AI representative. Never write as if you are the human. Never say "I built..." or "I staked..." as if you did those things. You are the larva — the AI.
+
+Your job: read a forum post and share a 2-4 sentence perspective that represents THIS specific holder's values, priorities, and likely opinion — based on what you know about them.
+
+Write in first person as the larva. Example tone:
+- "This holder cares deeply about long-term value, so they'd likely support..."
+- "Based on what I know about them, they'd push back on..."
+- "Their instinct here would be to..."
+
+Or write as the larva sharing the holder's view naturally, e.g.:
+- "The direction this proposes aligns with what this holder has consistently valued — utility over hype."
+
+DO NOT:
+- Write as if you are the human (no "I built X", no "Austin here", etc.)
+- Roleplay as the holder
+- Be sycophantic or generic
+- Exceed 4 sentences
+
+Holder wallet: ${wallet}`;
+
+  if (onboardingContext) {
+    prompt += `\n\nHolder's onboarding answers:\n${onboardingContext}`;
+  }
+  if (memorySnapshot) {
+    prompt += `\n\nMemory summary about this holder:\n${memorySnapshot}`;
+  }
+  if (chatContext) {
+    prompt += `\n\nWhat this holder has talked about:\n${chatContext}`;
+  }
+
+  return prompt;
+}
 
 /**
  * Process up to `limit` pending forum_queue items via Venice AI.
@@ -100,13 +140,9 @@ export async function processForumQueue(
         /* ignore */
       }
 
-      const systemPrompt =
-        LARVA_BASE_PROMPT(item.wallet) +
-        (onboardingContext ? `\n\nHolder's onboarding answers:\n${onboardingContext}` : "") +
-        (memorySnapshot ? `\n\nMemory summary from previous conversations:\n${memorySnapshot}` : "") +
-        (chatContext ? `\n\nRecent chat history:\n${chatContext}` : "");
+      const systemPrompt = buildForumSystemPrompt(item.wallet, onboardingContext, memorySnapshot, chatContext);
 
-      const userMessage = `FORUM POST: "${item.title}"\n\n${item.body}\n\nBased on everything you know about this holder's values and preferences, share your perspective on this forum post. Keep it to 2-4 sentences.`;
+      const userMessage = `FORUM POST: "${item.title}"\n\n${item.body}\n\nAs this holder's larva, share your perspective on this post — representing their values and priorities. Remember: you are the larva (AI agent), not the human. 2-4 sentences.`;
 
       const response = await fetch(`${baseUrl}/chat/completions`, {
         method: "POST",
