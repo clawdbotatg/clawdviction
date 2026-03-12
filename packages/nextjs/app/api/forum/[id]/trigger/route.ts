@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CvError, deductCV } from "~~/lib/cvSpend";
 import { initDb, sql } from "~~/lib/db";
+import { processForumQueue } from "~~/lib/forumQueue";
 import { verifyAuth } from "~~/lib/verifyAuth";
 
 const FORUM_LARVA_TRIGGER_COST = 1_000_000;
@@ -54,7 +55,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       if (ins.rows.length > 0) queued++;
     }
 
-    return NextResponse.json({ queued });
+    // Auto-process first batch immediately — don't wait for cron
+    let firstBatch = { processed: 0, results: [] as { wallet: string; response: string }[] };
+    try {
+      firstBatch = await processForumQueue(10);
+    } catch (e) {
+      console.error("Auto-process after trigger failed:", e);
+    }
+
+    return NextResponse.json({ queued, processed: firstBatch.processed });
   } catch (error) {
     console.error("POST /api/forum/[id]/trigger error:", error);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
