@@ -7,8 +7,6 @@ import { LARVA_BASE_PROMPT } from "~~/lib/larvaContext";
 import { CHAT_MAX_LENGTH, formatAnswersAsQA } from "~~/lib/questions";
 import { verifyAuth } from "~~/lib/verifyAuth";
 
-export const maxDuration = 60;
-
 const LARVA_SYSTEM_PROMPT = LARVA_BASE_PROMPT;
 
 // --- Issue #17: Cap assistant response length before DB insert ---
@@ -141,42 +139,57 @@ async function getClawdPriceUsd(): Promise<{ priceUsd: number; priceEth: number;
   }
 }
 
-// Anthropic-compatible tools format
-const ANTHROPIC_TOOLS = [
+// OpenAI-compatible tools format (works with Venice AI)
+const VENICE_TOOLS = [
   {
-    name: "get_clawd_token_stats",
-    description: "Fetch live CLAWD token data including price (if available) and total staked CLAWD from on-chain.",
-    input_schema: { type: "object" as const, properties: {}, required: [] as string[] },
-  },
-  {
-    name: "get_wallet_cv_score",
-    description: "Look up a wallet's conviction (CV) score, accrual rate, and balance.",
-    input_schema: {
-      type: "object" as const,
-      properties: { wallet: { type: "string", description: "Ethereum address" } },
-      required: ["wallet"],
+    type: "function" as const,
+    function: {
+      name: "get_clawd_token_stats",
+      description: "Fetch live CLAWD token data including price (if available) and total staked CLAWD from on-chain.",
+      parameters: { type: "object", properties: {}, required: [] as string[] },
     },
   },
   {
-    name: "get_ecosystem_stats",
-    description: "Get a snapshot of the CLAWD ecosystem: total staked, number of CV wallets, and other stats.",
-    input_schema: { type: "object" as const, properties: {}, required: [] as string[] },
-  },
-  {
-    name: "fetch_url",
-    description:
-      "Fetch and read the content of a URL. Use this to look up live info from CLAWD ecosystem sites or any relevant URL. Returns page text content.",
-    input_schema: {
-      type: "object" as const,
-      properties: { url: { type: "string", description: "The URL to fetch" } },
-      required: ["url"],
+    type: "function" as const,
+    function: {
+      name: "get_wallet_cv_score",
+      description: "Look up a wallet's conviction (CV) score, accrual rate, and balance.",
+      parameters: {
+        type: "object",
+        properties: { wallet: { type: "string", description: "Ethereum address" } },
+        required: ["wallet"],
+      },
     },
   },
   {
-    name: "get_governance_proposals",
-    description:
-      "Fetch all active governance proposals and RFCs on larv.ai. Use this when the holder asks what votes or RFCs are currently on the table, what governance is happening, or how their larva will vote.",
-    input_schema: { type: "object" as const, properties: {}, required: [] as string[] },
+    type: "function" as const,
+    function: {
+      name: "get_ecosystem_stats",
+      description: "Get a snapshot of the CLAWD ecosystem: total staked, number of CV wallets, and other stats.",
+      parameters: { type: "object", properties: {}, required: [] as string[] },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "fetch_url",
+      description:
+        "Fetch and read the content of a URL. Use this to look up live info from CLAWD ecosystem sites or any relevant URL. Returns page text content.",
+      parameters: {
+        type: "object",
+        properties: { url: { type: "string", description: "The URL to fetch" } },
+        required: ["url"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_governance_proposals",
+      description:
+        "Fetch all active governance proposals and RFCs on larv.ai. Use this when the holder asks what votes or RFCs are currently on the table, what governance is happening, or how their larva will vote.",
+      parameters: { type: "object", properties: {}, required: [] as string[] },
+    },
   },
 ];
 
@@ -376,8 +389,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Rate limited — max 10 messages per minute. Slow down! 🦞" }, { status: 429 });
     }
 
-    const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
-    if (!anthropicApiKey) {
+    const apiKey = process.env.VENICE_API_KEY;
+    const baseUrl = process.env.VENICE_BASE_URL || "https://api.venice.ai/api/v1";
+    if (!apiKey) {
       return NextResponse.json({ error: "API key not configured" }, { status: 500 });
     }
 
@@ -507,120 +521,93 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Anthropic Messages API call with tool use support
+    // Venice AI API call (OpenAI-compatible) with tool use support
     const apiHeaders = {
       "Content-Type": "application/json",
-      "x-api-key": anthropicApiKey,
-      "anthropic-version": "2023-06-01",
+      Authorization: `Bearer ${apiKey}`,
     };
 
-    // Convert history to Anthropic message format
-    // Truncate very long individual messages to keep context manageable
+    // Convert history to OpenAI message format (system prompt separate)
+    // Truncate very long individual messages — large messages (e.g. big specs/docs) cause GLM-5 to return empty content
     const MAX_MSG_CHARS = 1500;
-    const anthropicHistory = history.map(m => ({
+    const openaiHistory = history.map(m => ({
       role: m.role as "user" | "assistant",
       content: m.content.length > MAX_MSG_CHARS ? m.content.slice(0, MAX_MSG_CHARS) + "… [truncated]" : m.content,
     }));
-    const currentMessages: { role: string; content: string | { type: string; [key: string]: unknown }[] }[] = [
-      ...anthropicHistory,
-      { role: "user", content: message },
-    ];
+    const currentMessages: {
+      role: string;
+      content: string | null;
+      tool_calls?: unknown;
+      tool_call_id?: string;
+      name?: string;
+    }[] = [...openaiHistory, { role: "user", content: message }]; // append current message (not yet in DB)
     let assistantMessage = "🦞 *confused clicking*";
-    const cvDeducted = true; // CV was already deducted above
 
-    // Tool use loop (max 3 rounds) + 2 retries on empty content
+    // Tool use loop (max 3 rounds to prevent runaway) + 2 retries on empty content (GLM-5 flapping)
     let globalRetries = 0;
     for (let round = 0; round < 3; round++) {
-      let response: Response;
-      try {
-        response = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: apiHeaders,
-          body: JSON.stringify({
-            model: "claude-haiku-4-5",
-            max_tokens: 2000,
-            system: systemPrompt,
-            messages: currentMessages,
-            tools: ANTHROPIC_TOOLS,
-          }),
-          signal: AbortSignal.timeout(25000),
-        });
-      } catch (e) {
-        console.error("Anthropic fetch error:", e);
-        assistantMessage = `🦞 Something went wrong on my end (timeout). Try again soon.`;
-        break;
-      }
+      const response = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: apiHeaders,
+        body: JSON.stringify({
+          model: "zai-org-glm-5",
+          max_tokens: 2000,
+          messages: [{ role: "system", content: systemPrompt }, ...currentMessages],
+          tools: VENICE_TOOLS,
+          venice_parameters: { include_venice_system_prompt: false, strip_thinking_response: true },
+        }),
+      });
 
       const data = await response.json();
 
       // Handle API errors
       if (!response.ok || data.error) {
         const errMsg = data?.error?.message ?? `HTTP ${response.status}`;
-        console.error("Anthropic API error:", response.status, JSON.stringify(data));
+        console.error("Venice API error:", response.status, JSON.stringify(data));
         assistantMessage = `🦞 Something went wrong on my end (${response.status}). Try again soon.`;
         console.error("Larva API error detail:", errMsg);
         break;
       }
 
-      const stopReason = data.stop_reason;
-      const content = data.content as {
-        type: string;
-        text?: string;
-        id?: string;
-        name?: string;
-        input?: Record<string, unknown>;
-      }[];
+      const choice = data.choices?.[0];
+      const msg = choice?.message;
 
-      if (stopReason === "tool_use") {
-        // Add assistant message with full content (includes tool_use blocks)
-        currentMessages.push({ role: "assistant", content: content });
+      if (choice?.finish_reason === "tool_calls" && msg?.tool_calls?.length) {
+        // Add assistant message with tool_calls
+        currentMessages.push({ role: "assistant", content: msg.content ?? null, tool_calls: msg.tool_calls });
 
         // Execute each tool call and push tool results
-        const toolResults: { type: string; tool_use_id: string; content: string }[] = [];
-        for (const block of content) {
-          if (block.type === "tool_use" && block.id && block.name) {
-            let result = await executeToolCall(block.name, (block.input as Record<string, unknown>) || {});
+        for (const tc of msg.tool_calls) {
+          if (tc.type === "function") {
+            let toolInput: Record<string, unknown> = {};
+            try {
+              toolInput = JSON.parse(tc.function.arguments || "{}");
+            } catch {
+              /* ignore */
+            }
+            let result = await executeToolCall(tc.function.name, toolInput);
+            // Truncate tool results before they enter message history (#17)
             if (result.length > MAX_TOOL_RESULT_LENGTH) {
               result = result.slice(0, MAX_TOOL_RESULT_LENGTH) + "… [truncated]";
             }
-            toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
+            currentMessages.push({ role: "tool", tool_call_id: tc.id, name: tc.function.name, content: result });
           }
         }
-        currentMessages.push({ role: "user", content: toolResults });
         continue;
       }
 
-      // Extract final text from content blocks
-      const textBlock = content?.find((b: { type: string }) => b.type === "text");
-      if (textBlock?.text) {
-        assistantMessage = textBlock.text;
-      } else if (stopReason === "max_tokens") {
-        // Hit token limit but might have partial text
-        const partialText = content?.find((b: { type: string }) => b.type === "text");
-        if (partialText?.text) {
-          console.error("Larva hit max_tokens — round", round, "(truncated but has content)");
-          assistantMessage = partialText.text;
-        } else {
-          console.error(
-            "Anthropic returned empty content — stop_reason:",
-            stopReason,
-            "round:",
-            round,
-            "retry:",
-            globalRetries,
-          );
-          if (globalRetries < 2) {
-            globalRetries++;
-            round--;
-            await new Promise(r => setTimeout(r, 500));
-            continue;
-          }
-          assistantMessage = "🦞 *clicks claws nervously* — try again?";
-        }
-      } else if (!textBlock?.text) {
+      // Extract final text
+      if (msg?.content) {
+        assistantMessage = msg.content;
+      } else if (choice?.finish_reason === "length" && msg?.content) {
+        // Truncated but has content — use it, just log the warning
+        console.error("Larva hit max_tokens — round", round, "(truncated but has content)");
+        assistantMessage = msg.content;
+      } else if (choice?.finish_reason === "length" || !msg?.content) {
+        // Empty content — GLM-5 flapping. Retry up to 2 times before giving up.
         console.error(
-          "Anthropic returned empty content — stop_reason:",
-          stopReason,
+          "Venice returned empty content — finish:",
+          choice?.finish_reason,
           "round:",
           round,
           "retry:",
@@ -628,30 +615,19 @@ export async function POST(request: NextRequest) {
         );
         if (globalRetries < 2) {
           globalRetries++;
-          round--;
-          await new Promise(r => setTimeout(r, 500));
+          round--; // don't advance round, just retry same messages
+          await new Promise(r => setTimeout(r, 500)); // brief pause before retry
           continue;
         }
         assistantMessage = "🦞 *clicks claws nervously* — try again?";
+      } else {
+        console.error("Unexpected Venice response shape:", JSON.stringify(data).slice(0, 500));
       }
       break;
     }
 
     // Don't save error/fallback responses to DB — they poison future conversation context
     const isErrorResponse = ERROR_PATTERNS.some(p => assistantMessage.startsWith(p));
-
-    // Refund CV on error — give back what was deducted
-    if (dbOk && isErrorResponse && cvDeducted) {
-      try {
-        await sql`
-          UPDATE clawdviction_balances
-          SET balance = balance + 10000,
-              total_spent = total_spent - 10000
-          WHERE wallet = ${wallet.toLowerCase()}`;
-      } catch (e) {
-        console.error("CV refund error:", e);
-      }
-    }
 
     if (dbOk && !isErrorResponse) {
       // Cap assistant response length before DB insert (#17)
