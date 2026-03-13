@@ -29,6 +29,10 @@ export const menuLinks: HeaderMenuLink[] = [
     href: "/stake",
   },
   {
+    label: "Train",
+    href: "/train",
+  },
+  {
     label: "Gov",
     href: "/gov",
   },

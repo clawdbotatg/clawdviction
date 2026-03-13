@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 export default function OnboardRedirect() {
   const router = useRouter();
   useEffect(() => {
-    router.replace("/chat");
+    router.replace("/train");
   }, [router]);
   return null;
 }

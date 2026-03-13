@@ -81,7 +81,7 @@ const AboutPage: NextPage = () => {
           >
             GitHub →
           </a>
-          <Link href="/chat" className="btn btn-primary">
+          <Link href="/train" className="btn btn-primary">
             Meet Your Larva 🦀
           </Link>
         </div>
