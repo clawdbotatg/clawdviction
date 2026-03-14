@@ -3,7 +3,7 @@ import { CvError, deductCV } from "~~/lib/cvSpend";
 import { initDb, sql } from "~~/lib/db";
 import { verifyAuth } from "~~/lib/verifyAuth";
 
-const LABS_SUBMIT_COST = 500_000;
+const LABS_SUBMIT_COST = 1_000_000;
 
 export async function GET() {
   try {

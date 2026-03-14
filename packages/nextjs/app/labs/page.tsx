@@ -62,7 +62,7 @@ const LabsPage: NextPage = () => {
           <h1 className="text-3xl font-bold">🧪 Labs</h1>
           {address && (
             <Link href="/labs/submit" className="btn btn-primary btn-sm">
-              + Submit Idea (500k CV)
+              + Submit Idea (1M CV)
             </Link>
           )}
         </div>
