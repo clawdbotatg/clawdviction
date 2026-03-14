@@ -402,10 +402,9 @@ const ChatPage: NextPage = () => {
                   }
                 }}
                 placeholder="Talk to your larva..."
-                rows={1}
+                rows={3}
                 maxLength={CHAT_MAX_LENGTH}
                 className="textarea textarea-bordered rounded-none flex-1 resize-none"
-                style={{ minHeight: "2.75rem", maxHeight: "10rem", overflowY: "auto" }}
               />
               <button
                 onClick={sendMessage}
