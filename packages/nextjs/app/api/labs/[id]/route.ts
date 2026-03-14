@@ -12,7 +12,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
     const ideaResult = await sql`
       SELECT id, wallet, title, description, cv_burned::int as cv_burned,
-             total_cv::int as total_cv, status, created_at
+             total_cv::int as total_cv, status, larva_triggered, aggregated_opinion,
+             aggregated_opinion_short, created_at
       FROM labs_ideas WHERE id = ${id}`;
 
     if (ideaResult.rows.length === 0) {
@@ -24,9 +25,24 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       FROM labs_stakes WHERE idea_id = ${id}
       ORDER BY cv_amount DESC`;
 
+    const responseCountResult = await sql`
+      SELECT COUNT(*) as cnt FROM labs_responses WHERE idea_id = ${id}`;
+    const responseCount = parseInt(responseCountResult.rows[0].cnt);
+
+    const pendingCountResult = await sql`
+      SELECT COUNT(*) as cnt FROM labs_queue WHERE idea_id = ${id} AND status IN ('pending', 'processing')`;
+    const pendingCount = parseInt(pendingCountResult.rows[0].cnt);
+
+    const larvaResponses = await sql`
+      SELECT wallet, response, created_at FROM labs_responses
+      WHERE idea_id = ${id} ORDER BY created_at ASC`;
+
     return NextResponse.json({
       idea: ideaResult.rows[0],
       stakes: stakesResult.rows,
+      larvaResponseCount: responseCount,
+      larvaPendingCount: pendingCount,
+      larvaResponses: larvaResponses.rows,
     });
   } catch (error) {
     console.error("GET /api/labs/[id] error:", error);

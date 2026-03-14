@@ -122,6 +122,32 @@ export async function initDb() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     )`;
 
+  // Labs larva opinions
+  await sql`
+    CREATE TABLE IF NOT EXISTS labs_queue (
+      id SERIAL PRIMARY KEY,
+      idea_id INTEGER NOT NULL REFERENCES labs_ideas(id),
+      wallet TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      processed_at TIMESTAMPTZ,
+      UNIQUE(idea_id, wallet)
+    )`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS labs_responses (
+      id SERIAL PRIMARY KEY,
+      idea_id INTEGER NOT NULL REFERENCES labs_ideas(id),
+      wallet TEXT NOT NULL,
+      response TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(idea_id, wallet)
+    )`;
+
+  await sql`ALTER TABLE labs_ideas ADD COLUMN IF NOT EXISTS larva_triggered BOOLEAN DEFAULT false`;
+  await sql`ALTER TABLE labs_ideas ADD COLUMN IF NOT EXISTS aggregated_opinion TEXT`;
+  await sql`ALTER TABLE labs_ideas ADD COLUMN IF NOT EXISTS aggregated_opinion_short TEXT`;
+
   dbInitialized = true;
 }
 

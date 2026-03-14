@@ -19,11 +19,21 @@ interface IdeaData {
     cv_burned: number;
     total_cv: number;
     status: string;
+    larva_triggered: boolean;
+    aggregated_opinion: string | null;
+    aggregated_opinion_short: string | null;
     created_at: string;
   };
   stakes: {
     wallet: string;
     cv_amount: number;
+    created_at: string;
+  }[];
+  larvaResponseCount: number;
+  larvaPendingCount: number;
+  larvaResponses: {
+    wallet: string;
+    response: string;
     created_at: string;
   }[];
 }
@@ -63,6 +73,7 @@ export default function LabsIdeaPage({ params }: { params: Promise<{ id: string 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [balance, setBalance] = useState<number | null>(null);
+  const [triggering, setTriggering] = useState(false);
   const [adminStatus, setAdminStatus] = useState("");
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
@@ -81,6 +92,15 @@ export default function LabsIdeaPage({ params }: { params: Promise<{ id: string 
     fetchIdea();
   }, [id]);
 
+  // Poll while larvae are processing
+  useEffect(() => {
+    if (!data?.idea?.larva_triggered || data?.idea?.aggregated_opinion) return;
+    const interval = setInterval(() => {
+      fetchIdea();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [data?.idea?.larva_triggered, data?.idea?.aggregated_opinion]);
+
   useEffect(() => {
     if (!address) return;
     fetch(`/api/clawdviction/${address.toLowerCase()}`)
@@ -90,6 +110,34 @@ export default function LabsIdeaPage({ params }: { params: Promise<{ id: string 
       })
       .catch(() => {});
   }, [address]);
+
+  const handleTrigger = async () => {
+    if (!authData) return;
+    setTriggering(true);
+    setError("");
+    try {
+      const res = await authFetch(`/api/labs/${id}/trigger`, authData, { method: "POST" });
+      const result = await res.json();
+      if (!res.ok) {
+        setError(result.error || "Failed to trigger");
+      } else {
+        fetchIdea();
+        // Refresh balance
+        if (address) {
+          fetch(`/api/clawdviction/${address.toLowerCase()}`)
+            .then(r => r.json())
+            .then(d => {
+              if (d.balance !== undefined) setBalance(parseFloat(d.balance));
+            })
+            .catch(() => {});
+        }
+      }
+    } catch {
+      setError("Failed to trigger");
+    } finally {
+      setTriggering(false);
+    }
+  };
 
   const handleStake = async () => {
     if (!authData) return;
@@ -166,7 +214,7 @@ export default function LabsIdeaPage({ params }: { params: Promise<{ id: string 
     );
   }
 
-  const { idea, stakes } = data;
+  const { idea, stakes, larvaResponseCount, larvaPendingCount, larvaResponses } = data;
 
   return (
     <div className="flex flex-col items-center min-h-screen pt-10 px-4">
@@ -257,6 +305,91 @@ export default function LabsIdeaPage({ params }: { params: Promise<{ id: string 
             </div>
           )}
         </div>
+
+        {/* Larva Hive-Mind Section */}
+        {idea.larva_triggered ? (
+          <div className="card rounded-none bg-base-200 shadow-md mb-6">
+            <div className="card-body">
+              <h2 className="text-lg font-bold">🐛 Hive-Mind Opinion</h2>
+              {idea.aggregated_opinion ? (
+                <div className="mt-2">
+                  {idea.aggregated_opinion_short && (
+                    <p className="text-sm font-semibold text-info mb-2">{idea.aggregated_opinion_short}</p>
+                  )}
+                  <p className="whitespace-pre-wrap text-sm">{idea.aggregated_opinion}</p>
+                </div>
+              ) : (
+                <div className="mt-2">
+                  <p className="text-sm text-base-content/60">
+                    Larvae are responding... ({larvaResponseCount} responded, {larvaPendingCount} pending)
+                  </p>
+                  <span className="loading loading-dots loading-sm mt-2"></span>
+                </div>
+              )}
+
+              {larvaResponses && larvaResponses.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-base-300">
+                  <h3 className="text-md font-bold mb-3">{"🐛 Larva Perspectives (" + larvaResponses.length + ")"}</h3>
+                  <div className="space-y-2">
+                    {larvaResponses.map((lr, i) => (
+                      <div key={i} className="card rounded-none bg-base-300">
+                        <div className="card-body py-3 px-4">
+                          <div className="flex items-center gap-2 text-xs text-base-content/50 mb-1">
+                            <span className="inline-flex items-center gap-1">
+                              🐛 <Address address={lr.wallet} size="xs" />
+                            </span>
+                            <span>·</span>
+                            <span>{timeAgo(lr.created_at)}</span>
+                          </div>
+                          <p className="text-sm whitespace-pre-wrap">{lr.response}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {larvaPendingCount > 0 && (
+                    <p className="text-sm text-base-content/50 mt-2">{larvaPendingCount + " more processing..."}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="card rounded-none bg-base-200 shadow-md mb-6">
+            <div className="card-body">
+              <h2 className="text-lg font-bold">🐛 Hive-Mind Opinion</h2>
+              <p className="text-sm text-base-content/60 mt-1">
+                Get an aggregated opinion from all larvae on this idea.
+              </p>
+              {!address ? (
+                <div className="mt-2">
+                  <RainbowKitCustomConnectButton />
+                </div>
+              ) : !isAuthenticated ? (
+                <button className="btn btn-outline btn-sm mt-2 w-fit" onClick={signIn} disabled={signing}>
+                  {signing ? "Signing..." : "Sign in to trigger"}
+                </button>
+              ) : (
+                <div className="mt-2">
+                  <button
+                    className="btn btn-info btn-sm w-fit"
+                    onClick={handleTrigger}
+                    disabled={triggering || (balance !== null && balance < 1_000_000)}
+                  >
+                    {triggering ? (
+                      <span className="loading loading-spinner loading-xs"></span>
+                    ) : (
+                      "Get Larva Opinions (1M CV)"
+                    )}
+                  </button>
+                  {balance !== null && balance < 1_000_000 && (
+                    <p className="text-xs text-error mt-1">Insufficient CV balance</p>
+                  )}
+                </div>
+              )}
+              {error && <p className="text-error text-sm mt-2">{error}</p>}
+            </div>
+          </div>
+        )}
 
         {/* Admin Section */}
         {isAdmin && isAuthenticated && (
