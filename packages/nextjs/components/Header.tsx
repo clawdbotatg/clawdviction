@@ -41,6 +41,10 @@ export const menuLinks: HeaderMenuLink[] = [
     href: "/forum",
   },
   {
+    label: "Labs",
+    href: "/labs",
+  },
+  {
     label: "Chat",
     href: "https://t.me/ClawdChatTGBot",
     external: true,

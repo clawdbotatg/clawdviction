@@ -101,6 +101,27 @@ export async function initDb() {
   await sql`ALTER TABLE governance_proposals ADD COLUMN IF NOT EXISTS aggregated_opinion TEXT`;
   await sql`ALTER TABLE governance_proposals ADD COLUMN IF NOT EXISTS aggregated_opinion_short TEXT`;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS labs_ideas (
+      id SERIAL PRIMARY KEY,
+      wallet TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      cv_burned BIGINT NOT NULL DEFAULT 500000,
+      total_cv BIGINT NOT NULL DEFAULT 500000,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS labs_stakes (
+      id SERIAL PRIMARY KEY,
+      wallet TEXT NOT NULL,
+      idea_id INTEGER NOT NULL REFERENCES labs_ideas(id),
+      cv_amount BIGINT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )`;
+
   dbInitialized = true;
 }
 
