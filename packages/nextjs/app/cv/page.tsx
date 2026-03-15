@@ -12,9 +12,26 @@ type Staker = {
 
 const formatCV = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+const formatUsd = (n: number) =>
+  n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 const CVPage: NextPage = () => {
   const [stakers, setStakers] = useState<Staker[]>([]);
   const [loading, setLoading] = useState(true);
+  const [clawdPrice, setClawdPrice] = useState(0);
+
+  const fetchPrice = useCallback(async () => {
+    try {
+      const res = await fetch(
+        "https://api.dexscreener.com/latest/dex/tokens/0x9f86dB9fc6f7c9408e8Fda3Ff8ce4e78ac7a6b07",
+      );
+      const data = await res.json();
+      const price = parseFloat(data.pairs?.[0]?.priceUsd ?? "0");
+      if (price > 0) setClawdPrice(price);
+    } catch {
+      // silent
+    }
+  }, []);
 
   const fetchData = useCallback(async () => {
     try {
@@ -31,9 +48,13 @@ const CVPage: NextPage = () => {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 30000);
+    fetchPrice();
+    const interval = setInterval(() => {
+      fetchData();
+      fetchPrice();
+    }, 30000);
     return () => clearInterval(interval);
-  }, [fetchData]);
+  }, [fetchData, fetchPrice]);
 
   return (
     <div className="flex flex-col items-center flex-grow pt-10 px-5">
@@ -68,7 +89,12 @@ const CVPage: NextPage = () => {
                       <Address address={s.wallet} />
                     </td>
                     <td className="text-right">{formatCV(s.liveCV)}</td>
-                    <td className="text-right">{s.stakedM.toFixed(2)} M</td>
+                    <td className="text-right">
+                      {s.stakedM.toFixed(2)} M
+                      {clawdPrice > 0 && (
+                        <span className="text-base-content/50"> ({formatUsd(s.stakedM * 1_000_000 * clawdPrice)})</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
