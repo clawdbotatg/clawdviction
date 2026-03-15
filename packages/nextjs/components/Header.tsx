@@ -50,6 +50,10 @@ export const menuLinks: HeaderMenuLink[] = [
     external: true,
   },
   {
+    label: "CV",
+    href: "/cv",
+  },
+  {
     label: "About",
     href: "/about",
   },
