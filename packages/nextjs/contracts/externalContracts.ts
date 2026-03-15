@@ -3,7 +3,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const externalContracts = {
   8453: {
     UniswapV4StateView: {
-      address: "0x571291b572ed32ce6d16d22b1f58d6d9fa1a51a5",
+      address: "0xa3c0c9b65bad0b08107aa264b0f3db444b867a71",
       abi: [
         {
           name: "getSlot0",
