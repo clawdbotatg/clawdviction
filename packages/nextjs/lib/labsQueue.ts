@@ -46,8 +46,8 @@ Holder wallet: ${wallet}`;
 export async function processLabsQueue(
   limit = 10,
 ): Promise<{ processed: number; results: { wallet: string; response: string }[] }> {
-  const apiKey = process.env.VENICE_API_KEY;
-  if (!apiKey) throw new Error("No VENICE_API_KEY");
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("No ANTHROPIC_API_KEY");
 
   await initDb();
 
@@ -82,7 +82,7 @@ export async function processLabsQueue(
   }
 
   const results: { wallet: string; response: string }[] = [];
-  const baseUrl = process.env.VENICE_BASE_URL || "https://api.venice.ai/api/v1";
+  const anthropicUrl = "https://api.anthropic.com/v1/messages";
 
   for (const item of pending.rows) {
     try {
@@ -136,25 +136,22 @@ export async function processLabsQueue(
 
       const userMessage = `BUILD IDEA: "${item.title}"\n\n${item.description}\n\nAs this holder's larva, share your perspective on this build idea — representing their values and priorities. Remember: you are the larva (AI agent), not the human. 2-4 sentences.`;
 
-      const response = await fetch(`${baseUrl}/chat/completions`, {
+      const response = await fetch(anthropicUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "zai-org-glm-5",
+          model: "claude-haiku-4-5",
           max_tokens: 800,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userMessage },
-          ],
-          venice_parameters: { include_venice_system_prompt: false, strip_thinking_response: true },
+          messages: [{ role: "user", content: `${systemPrompt}\n\n${userMessage}` }],
         }),
       });
 
       const data = await response.json();
-      const text = data.choices?.[0]?.message?.content || "";
+      const text = data.content?.[0]?.text || "";
 
       await sql`
         INSERT INTO labs_responses (idea_id, wallet, response)
