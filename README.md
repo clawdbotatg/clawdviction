@@ -2,7 +2,9 @@
 
 > AI-powered conviction governance for $CLAWD holders. Stake tokens, train your personal AI larva, and let it represent you in governance.
 
-Inspired by [Vitalik Buterin's vision](https://x.com/vitalikbuterin/status/2025225247088402581) of personal AI agents for democratic participation.
+![ClawdViction](packages/nextjs/public/hero.jpg)
+
+Inspired by [Vitalik's tweet](https://x.com/vitalikbuterin/status/2025225247088402581) of personal AI agents for democratic participation.
 
 ---
 
@@ -55,7 +57,7 @@ clawdviction = amount_staked × seconds_staked
 
 Deployed on Vercel. Connect your wallet, stake some $CLAWD on Base, go through the onboarding interview, then chat with your larva. It knows who you are before you say a word.
 
-**Contract:** `ClawdVictionStaking` @ `0xAF206d40F293f5892ce86986BaFF5BB426a188a1` (Base mainnet)  
+**Contract:** `ClawdVictionStaking` @ `0xC9E377FB98a1aA6Ecf4B553cE1b57940121213bf` (Base mainnet)  
 **$CLAWD token:** `0x9f86dB9fc6f7c9408e8Fda3Ff8ce4e78ac7a6b07` (Base mainnet)
 
 ---
