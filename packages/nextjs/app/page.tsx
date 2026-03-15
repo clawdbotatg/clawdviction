@@ -119,9 +119,17 @@ const Home: NextPage = () => {
 
         {/* Contract Address */}
         {stakingContractData?.address && (
-          <div className="mb-16 text-center flex flex-col items-center gap-1">
+          <div className="mb-16 text-center flex flex-col items-center gap-3">
             <p className="text-xs text-base-content/40 uppercase tracking-widest">Staking Contract</p>
             <Address address={stakingContractData.address} />
+            <a
+              href="https://github.com/clawdbotatg/clawdviction/blob/main/skill.md"
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-outline btn-sm font-normal gap-1 mt-2"
+            >
+              🤖 Give this skill to your agent
+            </a>
           </div>
         )}
       </div>
