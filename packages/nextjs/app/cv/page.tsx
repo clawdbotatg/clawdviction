@@ -2,14 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { NextPage } from "next";
+import { Address } from "~~/components/scaffold-eth";
 
 type Staker = {
   wallet: string;
   liveCV: number;
   stakedM: number;
 };
-
-const truncateAddr = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 
 const formatCV = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -65,7 +64,9 @@ const CVPage: NextPage = () => {
                 {stakers.map((s, i) => (
                   <tr key={s.wallet} className="hover">
                     <td>{i + 1}</td>
-                    <td className="font-mono text-sm">{truncateAddr(s.wallet)}</td>
+                    <td>
+                      <Address address={s.wallet} />
+                    </td>
                     <td className="text-right">{formatCV(s.liveCV)}</td>
                     <td className="text-right">{s.stakedM.toFixed(2)} M</td>
                   </tr>
