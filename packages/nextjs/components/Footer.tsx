@@ -5,6 +5,7 @@ import { hardhat } from "viem/chains";
 import { CurrencyDollarIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { Faucet } from "~~/components/scaffold-eth";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
+import { useClawdPrice } from "~~/hooks/useClawdPrice";
 
 /**
  * Site footer
@@ -13,6 +14,7 @@ export const Footer = () => {
   const { targetNetwork } = useTargetNetwork();
   const isLocalNetwork = targetNetwork.id === hardhat.id;
   const { price: nativeCurrencyPrice } = useFetchNativeCurrencyPrice();
+  const clawdPrice = useClawdPrice();
 
   return (
     <div className="min-h-0 py-5 px-1 mb-11 lg:mb-0">
@@ -24,6 +26,14 @@ export const Footer = () => {
                 <div className="btn btn-primary btn-sm font-normal gap-1 cursor-auto">
                   <CurrencyDollarIcon className="h-4 w-4" />
                   <span>{nativeCurrencyPrice.toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+            {clawdPrice > 0 && (
+              <div>
+                <div className="btn btn-primary btn-sm font-normal gap-1 cursor-auto">
+                  <span>🦞</span>
+                  <span>${clawdPrice < 0.001 ? clawdPrice.toFixed(6) : clawdPrice.toFixed(4)}</span>
                 </div>
               </div>
             )}

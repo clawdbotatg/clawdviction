@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { NextPage } from "next";
 import { Address } from "~~/components/scaffold-eth";
+import { useClawdPrice } from "~~/hooks/useClawdPrice";
 
 type Staker = {
   wallet: string;
@@ -18,20 +19,7 @@ const formatUsd = (n: number) =>
 const CVPage: NextPage = () => {
   const [stakers, setStakers] = useState<Staker[]>([]);
   const [loading, setLoading] = useState(true);
-  const [clawdPrice, setClawdPrice] = useState(0);
-
-  const fetchPrice = useCallback(async () => {
-    try {
-      const res = await fetch(
-        "https://api.dexscreener.com/latest/dex/tokens/0x9f86dB9fc6f7c9408e8Fda3Ff8ce4e78ac7a6b07",
-      );
-      const data = await res.json();
-      const price = parseFloat(data.pairs?.[0]?.priceUsd ?? "0");
-      if (price > 0) setClawdPrice(price);
-    } catch {
-      // silent
-    }
-  }, []);
+  const clawdPrice = useClawdPrice();
 
   const fetchData = useCallback(async () => {
     try {
@@ -48,13 +36,9 @@ const CVPage: NextPage = () => {
 
   useEffect(() => {
     fetchData();
-    fetchPrice();
-    const interval = setInterval(() => {
-      fetchData();
-      fetchPrice();
-    }, 30000);
+    const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
-  }, [fetchData, fetchPrice]);
+  }, [fetchData]);
 
   return (
     <div className="flex flex-col items-center flex-grow pt-10 px-5">
