@@ -11,6 +11,10 @@
     {
       "path": "/api/labs/queue/process",
       "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/gov-process",
+      "schedule": "*/2 * * * *"
     }
   ]
 }

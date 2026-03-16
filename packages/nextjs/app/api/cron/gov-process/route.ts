@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initDb, sql } from "~~/lib/db";
 import { QueueItem, processQueueItem } from "~~/lib/processQueueItem";
-import { verifyAuth } from "~~/lib/verifyAuth";
 
-const ADMIN_WALLET = "0x11ce532845ce0eacda41f72fdc1c88c335981442";
+export async function GET(request: NextRequest) {
+  const authHeader = request.headers.get("authorization");
+  const secret = process.env.CRON_SECRET;
+  if (!secret || authHeader !== `Bearer ${secret}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-export async function POST(request: NextRequest) {
   try {
-    const wallet = await verifyAuth(request);
-    if (!wallet || wallet !== ADMIN_WALLET) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     const apiKey = process.env.VENICE_API_KEY;
     if (!apiKey) return NextResponse.json({ error: "No API key" }, { status: 500 });
 
@@ -26,7 +24,7 @@ export async function POST(request: NextRequest) {
       LIMIT 10`;
 
     if (pending.rows.length === 0) {
-      return NextResponse.json({ processed: 0, results: [] });
+      return NextResponse.json({ processed: 0 });
     }
 
     const results: { wallet: string; response: string }[] = [];
@@ -44,9 +42,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ processed: results.length, results });
+    return NextResponse.json({ processed: results.length });
   } catch (error) {
-    console.error("POST /api/gov/queue/process error:", error);
+    console.error("Cron gov-process error:", error);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
