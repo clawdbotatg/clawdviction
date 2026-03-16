@@ -115,6 +115,71 @@ Fully serverless on Vercel — no Docker, no persistent server. State lives in V
 
 ---
 
+## API Reference
+
+### `GET /api/cv/balance` — Public CV Balance Lookup
+
+No authentication required. Address is case-insensitive (lowercased internally).
+
+**Request:**
+```
+GET https://larv.ai/api/cv/balance?address=0x...
+```
+
+**Response (200):**
+```json
+{ "success": true, "balance": 347373 }
+```
+
+**Errors:**
+| Status | Body |
+|--------|------|
+| 400 | `{"success":false,"error":"missing address"}` |
+| 404 | `{"success":false,"error":"wallet not found"}` |
+
+**Example:**
+```bash
+curl "https://larv.ai/api/cv/balance?address=0xYourWalletAddress"
+```
+
+### `POST /api/cv/spend` — CV Spend (Protected)
+
+Requires a shared secret (`CV_SPEND_SECRET`) and an EIP-191 wallet signature.
+
+**Request:**
+```bash
+curl -X POST https://larv.ai/api/cv/spend \
+  -H "Content-Type: application/json" \
+  -d '{
+    "wallet": "0x...",
+    "signature": "<EIP-191 signature of \"larv.ai CV Spend\">",
+    "secret": "<CV_SPEND_SECRET>",
+    "amount": 100
+  }'
+```
+
+| Field | Description |
+|-------|-------------|
+| `wallet` | The wallet address to deduct CV from |
+| `signature` | EIP-191 signature of the string `"larv.ai CV Spend"` by the wallet |
+| `secret` | `CV_SPEND_SECRET` env var (shared secret for authorized services) |
+| `amount` | Positive integer — CV to deduct |
+
+**Response (200):**
+```json
+{ "success": true, "newBalance": 12345 }
+```
+
+**Errors:**
+| Status | Body |
+|--------|------|
+| 402 | `{"success":false,"error":"insufficient balance","balance":X}` |
+| 403 | `{"success":false,"error":"invalid secret"}` |
+| 403 | `{"success":false,"error":"invalid signature"}` |
+| 404 | `{"success":false,"error":"wallet not found"}` |
+
+---
+
 ## Onboarding Interview
 
 New wallets go through a 10-question interview before accessing chat. Topics:
