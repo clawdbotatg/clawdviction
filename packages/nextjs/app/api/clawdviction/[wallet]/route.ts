@@ -3,6 +3,16 @@ import { createPublicClient, getAddress, http, parseAbiItem } from "viem";
 import { base } from "viem/chains";
 import { initDb, isDbAvailable, sql } from "~~/lib/db";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: corsHeaders });
+}
+
 const STAKING_ADDRESS = "0xC9E377FB98a1aA6Ecf4B553cE1b57940121213bf" as const;
 const OLD_STAKING_ADDRESS = "0xAF206d40F293f5892ce86986BaFF5BB426a188a1" as const;
 
@@ -45,7 +55,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     try {
       wallet = getAddress(rawWallet) as `0x${string}`;
     } catch {
-      return NextResponse.json({ error: "Invalid address" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid address" }, { status: 400, headers: corsHeaders });
     }
 
     const walletLower = wallet.toLowerCase();
@@ -69,14 +79,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         // Return per-second rate as float for frontend optimistic counter
         const accrualRateFloat = Number(accrualRate) / Number(DIVISOR);
 
-        return NextResponse.json({
-          clawdviction: totalCv.toString(),
-          accrualRate: accrualRateFloat,
-          lastAccruedAt: lastAccruedAt.toISOString(),
-          balance: balance.toString(),
-          totalEarned: row.total_earned.toString(),
-          totalSpent: row.total_spent.toString(),
-        });
+        return NextResponse.json(
+          {
+            clawdviction: totalCv.toString(),
+            accrualRate: accrualRateFloat,
+            lastAccruedAt: lastAccruedAt.toISOString(),
+            balance: balance.toString(),
+            totalEarned: row.total_earned.toString(),
+            totalSpent: row.total_spent.toString(),
+          },
+          { headers: corsHeaders },
+        );
       }
     }
 
@@ -145,16 +158,19 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
-    return NextResponse.json({
-      clawdviction: totalCv.toString(),
-      accrualRate: Number(currentTotalStaked) / Number(DIVISOR),
-      lastAccruedAt: now.toISOString(),
-      balance: totalCv.toString(),
-      totalEarned: totalCv.toString(),
-      totalSpent: "0",
-    });
+    return NextResponse.json(
+      {
+        clawdviction: totalCv.toString(),
+        accrualRate: Number(currentTotalStaked) / Number(DIVISOR),
+        lastAccruedAt: now.toISOString(),
+        balance: totalCv.toString(),
+        totalEarned: totalCv.toString(),
+        totalSpent: "0",
+      },
+      { headers: corsHeaders },
+    );
   } catch (error) {
     console.error("Error reading clawdviction:", error);
-    return NextResponse.json({ clawdviction: "0", accrualRate: 0, error: true }, { status: 500 });
+    return NextResponse.json({ clawdviction: "0", accrualRate: 0, error: true }, { status: 500, headers: corsHeaders });
   }
 }
