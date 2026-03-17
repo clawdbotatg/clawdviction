@@ -72,6 +72,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
+    // For RFC proposals, fetch all larva responses (public transparency)
+    let larvaResponses: {
+      wallet: string;
+      response: string;
+      chosen_option: string | null;
+      reasoning: string | null;
+      created_at: string;
+    }[] = [];
+    if (proposal.type === "rfc") {
+      const lrResult = await sql`
+        SELECT wallet, response, chosen_option, reasoning, created_at
+        FROM governance_responses
+        WHERE proposal_id = ${id}
+        ORDER BY created_at ASC`;
+      larvaResponses = lrResult.rows as typeof larvaResponses;
+    }
+
     if (wallet?.toLowerCase() === ADMIN_WALLET) {
       // Admin: full response list joined with CV balance, sorted by balance DESC
       const responses = await sql`
@@ -91,6 +108,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         tallies,
         cvTotals,
         quadraticTotals,
+        larvaResponses,
       });
     } else if (wallet) {
       // Regular user: their response + queue status
@@ -114,11 +132,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         quadraticTotals,
         userResponse: userResponse.rows[0] || null,
         queueStatus: queueStatus.rows[0]?.status || null,
+        larvaResponses,
       });
     }
 
     // Public: proposal + count + tallies
-    return NextResponse.json({ proposal, responseCount, pendingCount, tallies, cvTotals, quadraticTotals });
+    return NextResponse.json({
+      proposal,
+      responseCount,
+      pendingCount,
+      tallies,
+      cvTotals,
+      quadraticTotals,
+      larvaResponses,
+    });
   } catch (error) {
     console.error("GET /api/gov/[id] error:", error);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });

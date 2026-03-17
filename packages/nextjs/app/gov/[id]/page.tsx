@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAccount } from "wagmi";
-import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
+import { Address, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useAuth } from "~~/hooks/useAuth";
 import { authFetch } from "~~/lib/authFetch";
 
@@ -51,7 +51,22 @@ interface ProposalData {
     created_at: string;
   } | null;
   queueStatus?: string | null;
+  larvaResponses?: {
+    wallet: string;
+    response: string;
+    chosen_option: string | null;
+    reasoning: string | null;
+    created_at: string;
+  }[];
 }
+
+const timeAgo = (dateStr: string) => {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const hours = Math.floor(diff / 3600000);
+  if (hours < 1) return `${Math.floor(diff / 60000)}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+};
 
 function TimeRemaining({ closesAt }: { closesAt: string }) {
   const [label, setLabel] = useState("");
@@ -190,6 +205,7 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
     quadraticTotals,
     userResponse,
     queueStatus,
+    larvaResponses,
   } = data;
 
   // Compute total votes for bar widths
@@ -726,6 +742,54 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
               ) : (
                 <p className="text-base-content/60">No response yet.</p>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Larva Perspectives — RFC only, public */}
+        {proposal.type === "rfc" && larvaResponses && larvaResponses.length > 0 && (
+          <div className="card rounded-none bg-base-200 shadow-md mb-6">
+            <div className="card-body">
+              <h2 className="text-lg font-semibold mb-3">
+                {"🐛 Larva Perspectives (" +
+                  (address
+                    ? larvaResponses.filter(lr => lr.wallet.toLowerCase() !== address.toLowerCase()).length
+                    : larvaResponses.length) +
+                  ")"}
+              </h2>
+              <div className="space-y-2">
+                {larvaResponses
+                  .filter(lr => !address || lr.wallet.toLowerCase() !== address.toLowerCase())
+                  .map((lr, i) => (
+                    <div key={i} className="card rounded-none bg-base-300">
+                      <div className="card-body py-3 px-4">
+                        <div className="flex items-center gap-2 text-xs text-base-content/50 mb-1">
+                          <span className="inline-flex items-center gap-1">
+                            🐛 <Address address={lr.wallet} size="xs" />
+                          </span>
+                          <span>·</span>
+                          <span>{timeAgo(lr.created_at)}</span>
+                        </div>
+                        <p className="text-sm whitespace-pre-wrap">{lr.response}</p>
+                        {lr.reasoning && (
+                          <p className="text-xs text-base-content/60 mt-1 whitespace-pre-wrap">{lr.reasoning}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                {address &&
+                  larvaResponses.filter(lr => lr.wallet.toLowerCase() !== address.toLowerCase()).length === 0 && (
+                    <p className="text-sm text-base-content/50">No other responses yet.</p>
+                  )}
+              </div>
+            </div>
+          </div>
+        )}
+        {proposal.type === "rfc" && (!larvaResponses || larvaResponses.length === 0) && (
+          <div className="card rounded-none bg-base-200 shadow-md mb-6">
+            <div className="card-body">
+              <h2 className="text-lg font-semibold mb-3">🐛 Larva Perspectives (0)</h2>
+              <p className="text-sm text-base-content/50">No responses yet.</p>
             </div>
           </div>
         )}
