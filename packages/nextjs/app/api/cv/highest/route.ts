@@ -11,6 +11,22 @@ export async function OPTIONS() {
   return new Response(null, { status: 204, headers: corsHeaders });
 }
 
+/**
+ * GET /api/cv/highest
+ *
+ * Returns the highest live CV balance across all wallets at the current moment.
+ *
+ * Live CV is calculated as:
+ *   liveCV = balance + (accrual_rate * elapsed_seconds) / DIVISOR
+ *   where DIVISOR = 1728000 * 1e18
+ *
+ * @returns {Object} `{ success: true, highestCVBalance: number }` — rounded to 2 decimal places
+ *
+ * @error 503 — database unavailable
+ * @error 500 — internal server error
+ *
+ * No auth required — public endpoint. CORS open (*).
+ */
 export async function GET() {
   try {
     await initDb();

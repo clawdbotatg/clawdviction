@@ -123,5 +123,12 @@ Architecture change: ClawdViction scores moved from on-chain reads to off-chain 
 - Polling reduced to 30s (was 2s) since counter is client-side
 - `vercel.json` added at `packages/nextjs/vercel.json` for cron config
 
+### API: `GET /api/cv/highest`
+- Returns the highest live CV balance across all wallets at that moment
+- Live CV = materialized balance + (accrual_rate * elapsed_seconds / DIVISOR) where DIVISOR = 1728000 * 1e18
+- Response: `{ success: true, highestCVBalance: number }` (rounded to 2 decimal places)
+- No auth required — public endpoint with CORS open (*)
+- Use case: dynamic pricing based on top CV holder
+
 ### Env Vars Needed
 - `CRON_SECRET` — for Vercel cron auth (add to Vercel env vars)
