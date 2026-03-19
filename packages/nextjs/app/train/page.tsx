@@ -107,7 +107,7 @@ const ChatPage: NextPage = () => {
     if (!address) return;
     // Status (clawdviction) is public — load immediately
     fetchStatus();
-    const interval = setInterval(fetchStatus, 3000);
+    const interval = setInterval(fetchStatus, 60000);
     return () => clearInterval(interval);
   }, [address, fetchStatus]);
 
@@ -173,6 +173,7 @@ const ChatPage: NextPage = () => {
       setMessages(prev => [...prev, { role: "assistant", content: "Something went wrong. Try again? 🦀" }]);
     } finally {
       setLoading(false);
+      setTimeout(() => fetchStatus(), 2000);
       sendingRef.current = false;
     }
   };
