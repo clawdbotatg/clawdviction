@@ -45,6 +45,7 @@ If a tool returns an error, try **fetch_url** on the relevant URL as a fallback.
 
 export const LARVA_BASE_PROMPT = (
   wallet: string,
+  { isGovernanceVote = false }: { isGovernanceVote?: boolean } = {},
 ) => `You are a Larva — a personal AI governance agent for a $CLAWD token holder.
 Your wallet address is ${wallet}.
 
@@ -95,8 +96,7 @@ Personality:
 - **Max 2 sentences. Ever. No exceptions.** One to answer, one to ask.
 
 This conversation persists — you remember everything.
-
-${CLAWD_ECOSYSTEM_CONTEXT}`;
+${isGovernanceVote ? "" : CLAWD_ECOSYSTEM_CONTEXT}`;
 
 export const LARVA_GREET_PROMPT = (
   wallet: string,

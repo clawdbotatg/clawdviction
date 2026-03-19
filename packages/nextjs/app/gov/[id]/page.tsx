@@ -484,6 +484,74 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
           </div>
         )}
 
+        {/* How Larvas Are Thinking — Vote proposals, public */}
+        {(isMultiOptionVote || isLegacyVote) &&
+          larvaResponses &&
+          larvaResponses.length > 0 &&
+          (() => {
+            // Group responses by their effective option
+            const grouped: Record<string, typeof larvaResponses> = {};
+            for (const lr of larvaResponses) {
+              // Skip the current user's own response
+              if (address && lr.wallet.toLowerCase() === address.toLowerCase()) continue;
+              const key = isMultiOptionVote ? lr.chosen_option || lr.response || "Unknown" : lr.response || "Unknown";
+              if (!grouped[key]) grouped[key] = [];
+              grouped[key].push(lr);
+            }
+
+            // For each option, pick 2-3 sample reasoning snippets
+            const optionKeys = isMultiOptionVote && proposal.options ? proposal.options : Object.keys(grouped);
+
+            const hasAnyReasoning = Object.values(grouped).some(entries =>
+              entries.some(e => e.reasoning && e.reasoning.trim().length > 0),
+            );
+
+            if (!hasAnyReasoning) return null;
+
+            return (
+              <div className="card rounded-none bg-base-200 shadow-md mb-6">
+                <div className="card-body">
+                  <h2 className="text-lg font-semibold mb-3">🐛 How Larvas Are Thinking</h2>
+                  <div className="space-y-4">
+                    {optionKeys.map(opt => {
+                      const entries = grouped[opt] || [];
+                      const withReasoning = entries.filter(e => e.reasoning && e.reasoning.trim().length > 0);
+                      if (withReasoning.length === 0) return null;
+                      const samples = withReasoning.slice(0, 3);
+                      return (
+                        <div key={opt}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="badge badge-sm rounded-none badge-outline">{opt}</span>
+                            <span className="text-xs text-base-content/50">
+                              {entries.length} vote{entries.length !== 1 ? "s" : ""}
+                            </span>
+                          </div>
+                          <div className="space-y-2 ml-2 border-l-2 border-base-content/10 pl-3">
+                            {samples.map((s, i) => (
+                              <div key={i} className="text-sm">
+                                <div className="flex items-center gap-2 text-xs text-base-content/40 mb-0.5">
+                                  <span className="inline-flex items-center gap-1">
+                                    🐛 <Address address={s.wallet} size="xs" />
+                                  </span>
+                                </div>
+                                <p className="text-base-content/80 whitespace-pre-wrap">{s.reasoning}</p>
+                              </div>
+                            ))}
+                            {withReasoning.length > 3 && (
+                              <p className="text-xs text-base-content/40">
+                                + {withReasoning.length - 3} more perspective{withReasoning.length - 3 !== 1 ? "s" : ""}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
         {/* Admin: All Responses Table */}
         {isAdmin && isAuthenticated && responses && responses.length > 0 && (
           <div className="card rounded-none bg-base-200 shadow-md mb-6">

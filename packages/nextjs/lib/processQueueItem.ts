@@ -70,8 +70,9 @@ export async function processQueueItem(item: QueueItem): Promise<{ wallet: strin
     /* ignore */
   }
 
+  const isGovernanceVote = item.type === "vote";
   const systemPrompt =
-    LARVA_BASE_PROMPT(item.wallet) +
+    LARVA_BASE_PROMPT(item.wallet, { isGovernanceVote }) +
     (onboardingContext ? `\n\nHolder's onboarding answers:\n${onboardingContext}` : "") +
     (memorySnapshot ? `\n\nMemory summary from previous conversations:\n${memorySnapshot}` : "") +
     (chatContext ? `\n\nRecent chat history:\n${chatContext}` : "");

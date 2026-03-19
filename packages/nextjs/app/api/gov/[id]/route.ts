@@ -72,7 +72,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
-    // For RFC proposals, fetch all larva responses (public transparency)
+    // Fetch all larva responses for public transparency (RFC + vote proposals)
     let larvaResponses: {
       wallet: string;
       response: string;
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       reasoning: string | null;
       created_at: string;
     }[] = [];
-    if (proposal.type === "rfc") {
+    if (proposal.type === "rfc" || proposal.type === "vote") {
       const lrResult = await sql`
         SELECT wallet, response, chosen_option, reasoning, created_at
         FROM governance_responses
