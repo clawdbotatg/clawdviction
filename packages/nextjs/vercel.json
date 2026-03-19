@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/accrue",
-      "schedule": "* * * * *"
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/forum-process",
