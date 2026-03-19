@@ -589,7 +589,13 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
                           </td>
                         )}
                         {proposal.type === "vote" && (
-                          <td className="max-w-sm text-xs truncate">{r.reasoning || "—"}</td>
+                          <td className="max-w-sm text-xs truncate">
+                            {r.reasoning ? (
+                              r.reasoning
+                            ) : (
+                              <span className="italic text-base-content/40">No reasoning provided</span>
+                            )}
+                          </td>
                         )}
                         {proposal.type === "rfc" && (
                           <td className="max-w-sm text-xs truncate">{r.human_note || "—"}</td>
