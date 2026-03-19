@@ -15,6 +15,13 @@ export async function GET(request: NextRequest) {
 
     await initDb();
 
+    // Reset items stuck in 'processing' for more than 10 minutes (crashed mid-flight)
+    await sql`
+      UPDATE governance_queue
+      SET status = 'pending'
+      WHERE status = 'processing'
+        AND created_at < NOW() - INTERVAL '10 minutes'`;
+
     const pending = await sql`
       SELECT q.id, q.proposal_id, q.wallet, p.type, p.title, p.question, p.options
       FROM governance_queue q
