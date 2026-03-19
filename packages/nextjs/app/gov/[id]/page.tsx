@@ -576,7 +576,7 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
                         <td className="font-mono text-xs">
                           {r.wallet.slice(0, 6)}...{r.wallet.slice(-4)}
                         </td>
-                        <td className="text-xs font-mono">{Number(r.cv_balance).toFixed(1)}</td>
+                        <td className="text-xs font-mono">{Math.floor(Number(r.cv_balance)).toLocaleString()}</td>
                         <td className="max-w-xs truncate">
                           {isMultiOptionVote ? r.chosen_option || r.response : r.response}
                         </td>
