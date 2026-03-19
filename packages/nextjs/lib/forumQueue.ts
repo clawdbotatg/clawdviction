@@ -44,15 +44,15 @@ Holder wallet: ${wallet}`;
 }
 
 /**
- * Process up to `limit` pending forum_queue items via Venice AI.
+ * Process up to `limit` pending forum_queue items via Anthropic Haiku.
  * Returns the number processed and result details.
  * Caller is responsible for calling initDb() before this if needed.
  */
 export async function processForumQueue(
   limit = 10,
 ): Promise<{ processed: number; results: { wallet: string; response: string }[] }> {
-  const apiKey = process.env.VENICE_API_KEY;
-  if (!apiKey) throw new Error("No VENICE_API_KEY");
+  const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicApiKey) throw new Error("No ANTHROPIC_API_KEY");
 
   await initDb();
 
@@ -89,7 +89,6 @@ export async function processForumQueue(
   }
 
   const results: { wallet: string; response: string }[] = [];
-  const baseUrl = process.env.VENICE_BASE_URL || "https://api.venice.ai/api/v1";
 
   for (const item of pending.rows) {
     try {
@@ -145,25 +144,36 @@ export async function processForumQueue(
 
       const userMessage = `FORUM POST: "${item.title}"\n\n${item.body}\n\nAs this holder's larva, share your perspective on this post — representing their values and priorities. Remember: you are the larva (AI agent), not the human. 2-4 sentences.`;
 
-      const response = await fetch(`${baseUrl}/chat/completions`, {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
+          "x-api-key": anthropicApiKey,
+          "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "zai-org-glm-5",
+          model: "claude-haiku-4-5",
           max_tokens: 800,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userMessage },
-          ],
-          venice_parameters: { include_venice_system_prompt: false, strip_thinking_response: true },
+          system: systemPrompt,
+          messages: [{ role: "user", content: userMessage }],
         }),
+        signal: AbortSignal.timeout(30000),
       });
 
+      if (!response.ok) {
+        const errBody = await response.text().catch(() => "");
+        throw new Error(`Anthropic API error ${response.status}: ${errBody}`);
+      }
+
       const data = await response.json();
-      const text = data.choices?.[0]?.message?.content || "";
+      if (data.error) {
+        throw new Error(`Anthropic API error: ${data.error.message || JSON.stringify(data.error)}`);
+      }
+
+      const text = data.content?.[0]?.text;
+      if (!text || typeof text !== "string" || text.trim().length === 0) {
+        throw new Error("Anthropic returned empty response — no content in response body");
+      }
 
       await sql`
         INSERT INTO forum_responses (post_id, wallet, response)

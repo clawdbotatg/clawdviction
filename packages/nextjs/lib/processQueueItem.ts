@@ -12,7 +12,7 @@ export interface QueueItem {
   options: string[] | null;
 }
 
-export async function processQueueItem(item: QueueItem, apiKey: string): Promise<{ wallet: string; response: string }> {
+export async function processQueueItem(item: QueueItem): Promise<{ wallet: string; response: string }> {
   // Mark processing
   await sql`UPDATE governance_queue SET status = 'processing' WHERE id = ${item.id}`;
 
@@ -88,26 +88,39 @@ export async function processQueueItem(item: QueueItem, apiKey: string): Promise
     userMessage = `GOVERNANCE RFC: "${item.title}"\n\nQuestion: ${item.question}\n\nBased on everything you know about this holder's values and preferences, provide a thoughtful comment representing their perspective. Keep it to 2-4 sentences.`;
   }
 
-  const baseUrl = process.env.VENICE_BASE_URL || "https://api.venice.ai/api/v1";
-  const response = await fetch(`${baseUrl}/chat/completions`, {
+  const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicApiKey) throw new Error("No ANTHROPIC_API_KEY configured");
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+      "x-api-key": anthropicApiKey,
+      "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "zai-org-glm-5",
+      model: "claude-haiku-4-5",
       max_tokens: 800,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMessage },
-      ],
-      venice_parameters: { include_venice_system_prompt: false, strip_thinking_response: true },
+      system: systemPrompt,
+      messages: [{ role: "user", content: userMessage }],
     }),
+    signal: AbortSignal.timeout(30000),
   });
 
+  if (!response.ok) {
+    const errBody = await response.text().catch(() => "");
+    throw new Error(`Anthropic API error ${response.status}: ${errBody}`);
+  }
+
   const data = await response.json();
-  const text = data.choices?.[0]?.message?.content || "";
+  if (data.error) {
+    throw new Error(`Anthropic API error: ${data.error.message || JSON.stringify(data.error)}`);
+  }
+
+  const text = data.content?.[0]?.text;
+  if (!text || typeof text !== "string" || text.trim().length === 0) {
+    throw new Error("Anthropic returned empty response — no content in response body");
+  }
 
   let responseText = text;
   let reasoning: string | null = null;

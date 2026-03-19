@@ -12,9 +12,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const apiKey = process.env.VENICE_API_KEY;
-    if (!apiKey) return NextResponse.json({ error: "No API key" }, { status: 500 });
-
     await initDb();
 
     const pending = await sql`
@@ -31,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     const results: { wallet: string; response: string }[] = [];
 
-    const settled = await Promise.allSettled((pending.rows as QueueItem[]).map(item => processQueueItem(item, apiKey)));
+    const settled = await Promise.allSettled((pending.rows as QueueItem[]).map(item => processQueueItem(item)));
 
     for (let i = 0; i < settled.length; i++) {
       const item = pending.rows[i] as QueueItem;

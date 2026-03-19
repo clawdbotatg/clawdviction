@@ -10,9 +10,6 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const apiKey = process.env.VENICE_API_KEY;
-    if (!apiKey) return NextResponse.json({ error: "No API key" }, { status: 500 });
-
     await initDb();
 
     // Reset items stuck in 'processing' for more than 10 minutes (crashed mid-flight)
@@ -36,7 +33,7 @@ export async function GET(request: NextRequest) {
 
     const results: { wallet: string; response: string }[] = [];
 
-    const settled = await Promise.allSettled((pending.rows as QueueItem[]).map(item => processQueueItem(item, apiKey)));
+    const settled = await Promise.allSettled((pending.rows as QueueItem[]).map(item => processQueueItem(item)));
 
     for (let i = 0; i < settled.length; i++) {
       const item = pending.rows[i] as QueueItem;
