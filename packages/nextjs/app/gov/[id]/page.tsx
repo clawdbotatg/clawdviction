@@ -9,6 +9,12 @@ import { authFetch } from "~~/lib/authFetch";
 
 const ADMIN_WALLET = "0x11ce532845ce0eacda41f72fdc1c88c335981442";
 
+/** Strip trailing markdown bold artifacts (e.g. "**") from AI-generated reasoning */
+const cleanReasoning = (text: string | null | undefined): string | null => {
+  if (!text) return null;
+  return text.replace(/\*{2,}\s*$/, "").trimEnd();
+};
+
 interface ProposalData {
   proposal: {
     id: number;
@@ -534,7 +540,9 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
                                     🐛 <Address address={s.wallet} size="xs" />
                                   </span>
                                 </div>
-                                <p className="text-base-content/80 whitespace-pre-wrap">{s.reasoning}</p>
+                                <p className="text-base-content/80 whitespace-pre-wrap">
+                                  {cleanReasoning(s.reasoning)}
+                                </p>
                               </div>
                             ))}
                             {withReasoning.length > 3 && (
@@ -591,7 +599,7 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
                         {proposal.type === "vote" && (
                           <td className="max-w-sm text-xs truncate">
                             {r.reasoning ? (
-                              r.reasoning
+                              cleanReasoning(r.reasoning)
                             ) : (
                               <span className="italic text-base-content/40">No reasoning provided</span>
                             )}
@@ -685,7 +693,9 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
                       ) : (
                         userResponse.response
                       )}
-                      {userResponse.reasoning && <p className="mt-2 text-sm opacity-80">{userResponse.reasoning}</p>}
+                      {userResponse.reasoning && (
+                        <p className="mt-2 text-sm opacity-80">{cleanReasoning(userResponse.reasoning)}</p>
+                      )}
                     </div>
                   </div>
 
@@ -846,7 +856,9 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
                         </div>
                         <p className="text-sm whitespace-pre-wrap">{lr.response}</p>
                         {lr.reasoning && (
-                          <p className="text-xs text-base-content/60 mt-1 whitespace-pre-wrap">{lr.reasoning}</p>
+                          <p className="text-xs text-base-content/60 mt-1 whitespace-pre-wrap">
+                            {cleanReasoning(lr.reasoning)}
+                          </p>
                         )}
                       </div>
                     </div>
