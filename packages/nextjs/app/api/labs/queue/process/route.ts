@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processLabsQueue } from "~~/lib/labsQueue";
 
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get("authorization");

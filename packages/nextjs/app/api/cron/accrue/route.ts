@@ -3,6 +3,8 @@ import { createPublicClient, http, parseAbiItem } from "viem";
 import { base } from "viem/chains";
 import { initDb, isDbAvailable, sql } from "~~/lib/db";
 
+export const maxDuration = 30;
+
 const STAKING_ADDRESS = "0xC9E377FB98a1aA6Ecf4B553cE1b57940121213bf" as const;
 
 const StakedEvent = parseAbiItem(

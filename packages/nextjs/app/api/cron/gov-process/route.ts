@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { initDb, sql } from "~~/lib/db";
 import { QueueItem, processQueueItem } from "~~/lib/processQueueItem";
 
+export const maxDuration = 60;
+
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   const secret = process.env.CRON_SECRET;
