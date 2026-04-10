@@ -14,6 +14,7 @@ import {
   useTargetNetwork,
 } from "~~/hooks/scaffold-eth";
 
+const BURN_ADDRESS = "0x000000000000000000000000000000000000dEaD" as const;
 const CLAWD_ETH_POOL = "0xCD55381a53da35Ab1D7Bc5e3fE5F76cac976FAc3" as const;
 const WETH_BASE = "0x4200000000000000000000000000000000000006";
 const POOL_ABI = [
@@ -84,6 +85,17 @@ const StakePage: NextPage = () => {
     watch: true,
   });
 
+  const { data: clawdTotalSupply } = useScaffoldReadContract({
+    contractName: "MockCLAWD",
+    functionName: "totalSupply",
+  });
+
+  const { data: burnBalance } = useScaffoldReadContract({
+    contractName: "MockCLAWD",
+    functionName: "balanceOf",
+    args: [BURN_ADDRESS],
+  });
+
   const { data: activeStakesData } = useScaffoldReadContract({
     contractName: "ClawdVictionStaking",
     functionName: "getActiveStakes",
@@ -109,6 +121,22 @@ const StakePage: NextPage = () => {
       return null;
     }
   }, [slot0Data, token0Data, ethPrice]);
+
+  // Circulating supply & staked percentage
+  const { stakedPct, burnedFormatted } = useMemo(() => {
+    if (!clawdTotalSupply || !burnBalance || !totalSupplyStaked) {
+      return { stakedPct: null, burnedFormatted: null };
+    }
+    const circulating = clawdTotalSupply - burnBalance;
+    const pct =
+      circulating > 0n ? (Number(formatEther(totalSupplyStaked)) / Number(formatEther(circulating))) * 100 : 0;
+    const burnedNum = Number(formatEther(burnBalance));
+    let burned: string;
+    if (burnedNum >= 1_000_000_000) burned = `${(burnedNum / 1_000_000_000).toFixed(2)}B`;
+    else if (burnedNum >= 1_000_000) burned = `${(burnedNum / 1_000_000).toFixed(2)}M`;
+    else burned = burnedNum.toLocaleString();
+    return { stakedPct: pct, burnedFormatted: burned };
+  }, [clawdTotalSupply, burnBalance, totalSupplyStaked]);
 
   // Write hooks - SEPARATE for each action
   const { writeContractAsync: approveWrite, isMining: isApproving } = useScaffoldWriteContract("MockCLAWD");
@@ -360,7 +388,11 @@ const StakePage: NextPage = () => {
         </div>
         <div className="stat bg-base-200 rounded-none shadow">
           <div className="stat-title">Total Staked (All)</div>
-          <div className="stat-value text-2xl">{totalSupplyStaked ? formatClawd(totalSupplyStaked) : "0"}</div>
+          <div className="stat-value text-2xl">
+            {totalSupplyStaked ? formatClawd(totalSupplyStaked) : "0"}
+            {stakedPct !== null && <span className="text-lg text-base-content/70 ml-1">({stakedPct.toFixed(1)}%)</span>}
+          </div>
+          {burnedFormatted && <div className="stat-desc">🔥 {burnedFormatted} burned</div>}
         </div>
       </div>
 
