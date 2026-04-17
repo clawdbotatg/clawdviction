@@ -326,7 +326,7 @@ async function executeToolCall(name: string, input: Record<string, unknown>): Pr
     }
 
     if (name === "get_governance_proposals") {
-      const res = await fetch("http://localhost:3000/api/gov", {
+      const res = await fetch("https://larv.ai/api/gov", {
         signal: AbortSignal.timeout(5000),
       });
       if (!res.ok) return JSON.stringify({ error: `API returned ${res.status}` });
