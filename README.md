@@ -119,7 +119,7 @@ Fully serverless on Vercel — no Docker, no persistent server. State lives in V
 
 All endpoints are under `https://larv.ai/api/`. Auth types:
 - **Public** — no auth required
-- **Wallet auth** — requires `x-wallet` + `x-signature` headers (EIP-191 signature verification via `verifyAuth`)
+- **Wallet auth** — requires `x-wallet` + `x-signature` headers (signature verification via `verifyAuth`). Supports both **EOA wallets** and **ERC-1271 smart contract wallets** (Coinbase Smart Wallet, Safe, etc.) — see [`docs/smart-wallet-support.md`](docs/smart-wallet-support.md)
 - **Admin** — wallet auth + must be the admin wallet
 - **CRON_SECRET** — `Authorization: Bearer <CRON_SECRET>` header
 - **CV_SPEND_SECRET** — shared secret in request body
@@ -132,7 +132,7 @@ All endpoints are under `https://larv.ai/api/`. Auth types:
 |--------|------|------|-------------|
 | `GET` | `/api/clawdviction/[wallet]` | Public | Get wallet's CV score, accrual rate, balance, total earned/spent. Seeds from on-chain if no DB row exists. |
 | `GET` | `/api/cv/balance` | Public | Simple CV balance lookup. Query param: `?address=0x...`. Returns `{ success, balance }`. |
-| `POST` | `/api/cv/spend` | CV_SPEND_SECRET + wallet signature | Deduct CV from a wallet. Body: `{ wallet, signature, secret, amount }`. Signature is EIP-191 of `"larv.ai CV Spend"`. Returns `{ success, newBalance }`. |
+| `POST` | `/api/cv/spend` | CV_SPEND_SECRET + wallet signature | Deduct CV from a wallet. Body: `{ wallet, signature, secret, amount }`. Signature of `"larv.ai CV Spend"` (EOA or ERC-1271 smart wallet). Returns `{ success, newBalance }`. |
 | `GET` | `/api/cv/leaderboard` | Public | Top 100 stakers by live CV. Returns `{ stakers: [{ wallet, liveCV, stakedM }] }`. |
 
 **`GET /api/clawdviction/[wallet]` response:**
@@ -321,7 +321,7 @@ Or connect the repo in the Vercel dashboard:
 
 - **Scaffold-ETH 2** — Next.js App Router + Hardhat
 - **Solidity ^0.8.20** — OpenZeppelin SafeERC20
-- **Next.js + TypeScript** — App Router, RainbowKit, Wagmi, Viem
+- **Next.js + TypeScript** — App Router, RainbowKit, Wagmi, Viem (ERC-1271 smart wallet support)
 - **DaisyUI + Tailwind** — styling
 - **Anthropic Haiku** — larva AI (chat, onboarding, labs aggregation)
 - **Venice AI (GLM-5)** — governance + labs queue processing

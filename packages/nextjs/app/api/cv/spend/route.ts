@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyMessage } from "viem";
+import { createPublicClient, http } from "viem";
+import { base } from "viem/chains";
 import { initDb, isDbAvailable, sql } from "~~/lib/db";
+
+// Public client for on-chain signature verification (supports both EOA and ERC-1271 smart contract wallets)
+const publicClient = createPublicClient({
+  chain: base,
+  transport: http(
+    `https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || "cR4WnXePioePZ5fFrnSiR"}`,
+  ),
+});
 
 const CV_SPEND_MESSAGE = "larv.ai CV Spend";
 const CV_SPEND_SECRET = process.env.CV_SPEND_SECRET;
@@ -27,7 +36,7 @@ export async function POST(request: NextRequest) {
     // --- Verify wallet signature ---
     let signatureValid = false;
     try {
-      signatureValid = await verifyMessage({
+      signatureValid = await publicClient.verifyMessage({
         address: wallet as `0x${string}`,
         message: CV_SPEND_MESSAGE,
         signature: signature as `0x${string}`,

@@ -1,5 +1,14 @@
 import { NextRequest } from "next/server";
-import { verifyMessage } from "viem";
+import { createPublicClient, http } from "viem";
+import { base } from "viem/chains";
+
+// Public client for on-chain signature verification (supports both EOA and ERC-1271 smart contract wallets)
+const publicClient = createPublicClient({
+  chain: base,
+  transport: http(
+    `https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || "cR4WnXePioePZ5fFrnSiR"}`,
+  ),
+});
 
 export async function verifyAuth(request: NextRequest): Promise<string | null> {
   const signature = request.headers.get("x-auth-signature");
@@ -23,7 +32,7 @@ export async function verifyAuth(request: NextRequest): Promise<string | null> {
   if (isNaN(expiresAt) || expiresAt < Date.now()) return null;
 
   try {
-    const valid = await verifyMessage({
+    const valid = await publicClient.verifyMessage({
       address: address as `0x${string}`,
       message,
       signature: signature as `0x${string}`,

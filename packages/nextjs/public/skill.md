@@ -13,7 +13,7 @@ The **GET /balance** endpoint is public — no auth required.
 
 The **POST /spend** endpoint requires:
 1. Your builder **CV_SPEND_SECRET** — get this from the larv.ai team
-2. The user's **EIP-191 wallet signature** — users sign `"larv.ai CV Spend"` with their wallet
+2. The user's **wallet signature** — users sign `"larv.ai CV Spend"` with their wallet (supports both EOA and ERC-1271 smart contract wallets like Coinbase Smart Wallet)
 
 ---
 
@@ -66,7 +66,7 @@ Content-Type: application/json
 | `wallet` | string | Yes | Wallet address (hex) |
 | `secret` | string | Yes | Your CV_SPEND_SECRET from larv.ai |
 | `amount` | integer | Yes | CV units to charge (positive integer) |
-| `signature` | string | Yes | EIP-191 signature of `"larv.ai CV Spend"` from the wallet |
+| `signature` | string | Yes | Signature of `"larv.ai CV Spend"` from the wallet (EOA or ERC-1271 smart wallet) |
 
 **Response (200 — success):**
 ```json
@@ -103,9 +103,11 @@ import { Wallet } from "ethers";
 const signer = new Wallet(privateKey);
 const signature = await signer.signMessage("larv.ai CV Spend");
 
-// On-chain verification (if needed)
-import { verifyMessage } from "viem";
-const valid = await verifyMessage({
+// On-chain verification (if needed — supports EOA + ERC-1271 smart wallets)
+import { createPublicClient, http } from "viem";
+import { base } from "viem/chains";
+const publicClient = createPublicClient({ chain: base, transport: http() });
+const valid = await publicClient.verifyMessage({
   address: walletAddress,
   message: "larv.ai CV Spend",
   signature,
@@ -203,3 +205,4 @@ if (result.success) {
 - **Never expose the secret client-side** — call /spend from your backend server. The example above shows the correct pattern.
 - **GET /balance has open CORS** — safe for client-side calls.
 - **POST /spend requires wallet signature** — users must sign with their own wallet. You cannot charge a wallet without their signature.
+- **Smart wallet support** — Coinbase Smart Wallet and other ERC-1271 wallets are fully supported. Signature verification works for both EOA and smart contract wallets.
