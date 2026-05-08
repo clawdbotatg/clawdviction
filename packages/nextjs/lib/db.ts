@@ -147,6 +147,8 @@ export async function initDb() {
   await sql`ALTER TABLE labs_ideas ADD COLUMN IF NOT EXISTS larva_triggered BOOLEAN DEFAULT false`;
   await sql`ALTER TABLE labs_ideas ADD COLUMN IF NOT EXISTS aggregated_opinion TEXT`;
   await sql`ALTER TABLE labs_ideas ADD COLUMN IF NOT EXISTS aggregated_opinion_short TEXT`;
+  await sql`ALTER TABLE labs_ideas ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT false`;
+  await sql`ALTER TABLE labs_ideas ADD COLUMN IF NOT EXISTS archived_by TEXT`;
 
   dbInitialized = true;
 }
