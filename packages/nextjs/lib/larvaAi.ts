@@ -38,7 +38,10 @@ export async function runLarvaConversation(opts: LarvaRunOptions): Promise<Larva
   if (process.env.VENICE_API_KEY) {
     try {
       const text = await runVenice(opts);
-      if (text && text.trim()) return { text, provider: "venice" };
+      if (text && text.trim()) {
+        console.log("[larvaAi] provider=venice");
+        return { text, provider: "venice" };
+      }
       console.warn("[larvaAi] Venice returned empty content — falling back to Anthropic");
     } catch (e) {
       console.warn("[larvaAi] Venice failed — falling back to Anthropic:", e instanceof Error ? e.message : e);
@@ -46,6 +49,7 @@ export async function runLarvaConversation(opts: LarvaRunOptions): Promise<Larva
   }
 
   const text = await runAnthropic(opts);
+  console.log("[larvaAi] provider=anthropic");
   return { text, provider: "anthropic" };
 }
 
