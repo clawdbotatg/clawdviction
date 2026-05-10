@@ -45,6 +45,76 @@ try {
   console.log("⚠️  Could not read deployedContracts.ts — will need manual config or redeploy");
 }
 
+// --- Model providers (Venice primary, Anthropic Haiku fallback) ---
+const VENICE_API_KEY = process.env.VENICE_API_KEY || "";
+const VENICE_BASE_URL = process.env.VENICE_BASE_URL || "https://api.venice.ai/api/v1";
+const VENICE_MODEL = "kimi-k2-6";
+const ANTHROPIC_MODEL = "claude-haiku-4-5";
+
+// Anthropic API key — try .openclaw auth profile first, then env var.
+const ANTHROPIC_API_KEY = (() => {
+  try {
+    const authPath = path.join(process.env.HOME || "", ".openclaw/agents/clawdheart/agent/auth-profiles.json");
+    const auth = JSON.parse(require("fs").readFileSync(authPath, "utf-8"));
+    return auth.profiles["anthropic:default"]?.key || "";
+  } catch {
+    return process.env.ANTHROPIC_API_KEY || "";
+  }
+})();
+
+async function chatWithFallback(opts: {
+  system: string;
+  messages: { role: string; content: string }[];
+  maxTokens: number;
+}): Promise<string> {
+  if (VENICE_API_KEY) {
+    try {
+      const res = await fetch(`${VENICE_BASE_URL}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${VENICE_API_KEY}` },
+        body: JSON.stringify({
+          model: VENICE_MODEL,
+          max_tokens: opts.maxTokens,
+          messages: [{ role: "system", content: opts.system }, ...opts.messages],
+          venice_parameters: {
+            include_venice_system_prompt: false,
+            strip_thinking_response: true,
+            disable_thinking: true,
+          },
+        }),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+        const text = data.choices?.[0]?.message?.content;
+        if (text && text.trim()) return text;
+      } else {
+        console.warn("Venice non-OK:", res.status, (await res.text()).slice(0, 200));
+      }
+    } catch (e: any) {
+      console.warn("Venice failed, falling back to Anthropic:", e.message);
+    }
+  }
+
+  if (!ANTHROPIC_API_KEY) throw new Error("No API keys available");
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: ANTHROPIC_MODEL,
+      max_tokens: opts.maxTokens,
+      system: opts.system,
+      messages: opts.messages,
+    }),
+  });
+  if (!res.ok) throw new Error(`Anthropic ${res.status}`);
+  const data = (await res.json()) as { content?: { text?: string }[] };
+  return data.content?.[0]?.text || "";
+}
+
 // --- Database ---
 const db = new Database(path.join(__dirname, "clawdviction.db"));
 db.pragma("journal_mode = WAL");
@@ -257,25 +327,13 @@ async function compressMemory(wallet: string): Promise<void> {
   const msgText = toCompress.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n");
 
   try {
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-haiku-4-5",
-        max_tokens: 500,
-        system: `Summarize this governance larva conversation into a compact memory snapshot under 400 tokens.
+    const snapshot = await chatWithFallback({
+      system: `Summarize this governance larva conversation into a compact memory snapshot under 400 tokens.
 Capture: holder's name, key values, governance positions, things they care about, open threads.
 This replaces raw history — preserve everything needed to represent this person accurately.`,
-        messages: [{ role: "user", content: `${priorContext}${msgText}` }],
-      }),
+      messages: [{ role: "user", content: `${priorContext}${msgText}` }],
+      maxTokens: 500,
     });
-    if (!resp.ok) return;
-    const data = await resp.json();
-    const snapshot = data.content?.[0]?.text;
     if (!snapshot) return;
 
     db.prepare(`
@@ -327,24 +385,15 @@ app.post("/api/onboard/:wallet", async (req, res) => {
     }
   }
 
-  // Generate identity brief via Sonnet (one-time, high stakes)
-  let identity_brief = null;
+  // Generate identity brief — one-time, high stakes. Venice primary, Anthropic Haiku fallback.
+  let identity_brief: string | null = null;
   try {
     const answerText = Object.entries(answers)
       .map(([q, a]) => `Q: ${q}\nA: ${a}`)
       .join("\n\n");
 
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-5",
-        max_tokens: 600,
-        system: `You are summarizing a $CLAWD token holder's onboarding interview into a compact identity brief.
+    identity_brief = (await chatWithFallback({
+      system: `You are summarizing a $CLAWD token holder's onboarding interview into a compact identity brief.
 This brief will be injected into an AI governance agent's system prompt on EVERY conversation.
 Be specific and concrete. Use their actual words where possible. Under 500 tokens.
 
@@ -376,13 +425,9 @@ Hard lines (instant NO):
 Magic wand: "[verbatim quote]"
 
 Biggest concern: [answer]`,
-        messages: [{ role: "user", content: `Wallet: ${w}\n\n${answerText}` }],
-      }),
-    });
-    if (resp.ok) {
-      const data = await resp.json();
-      identity_brief = data.content?.[0]?.text || null;
-    }
+      messages: [{ role: "user", content: `Wallet: ${w}\n\n${answerText}` }],
+      maxTokens: 600,
+    })) || null;
   } catch (e: any) {
     console.error("Brief generation error:", e.message);
   }
@@ -442,27 +487,11 @@ app.post("/api/chat", async (req, res) => {
     compressMemory(w).catch(() => {}); // fire-and-forget
   }
 
-  // Call Anthropic directly with persistent history
+  // Venice primary, Anthropic Haiku fallback.
   try {
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-haiku-4-5",
-        max_tokens: 400,
-        system: systemPrompt,
-        messages: contextMessages,
-      }),
-    });
-
-    if (!resp.ok) throw new Error(`Anthropic ${resp.status}`);
-
-    const data = await resp.json();
-    const reply = data.content?.[0]?.text || "🦞 *confused clicking*";
+    const reply =
+      (await chatWithFallback({ system: systemPrompt, messages: contextMessages, maxTokens: 400 })) ||
+      "🦞 *confused clicking*";
 
     // Save assistant reply to DB
     db.prepare(
@@ -483,15 +512,6 @@ app.post("/api/chat", async (req, res) => {
 // --- Larva Management ---
 const larvaProcesses = new Map<string, { port: number; child?: any }>();
 let nextLarvaPort = 4100;
-
-// Read Anthropic API key for larvae
-const ANTHROPIC_API_KEY = (() => {
-  try {
-    const authPath = path.join(process.env.HOME || "", ".openclaw/agents/clawdheart/agent/auth-profiles.json");
-    const auth = JSON.parse(require("fs").readFileSync(authPath, "utf-8"));
-    return auth.profiles["anthropic:default"]?.key || "";
-  } catch { return process.env.ANTHROPIC_API_KEY || ""; }
-})();
 
 function getLarvaPort(walletShort: string): number {
   const info = larvaProcesses.get(walletShort);

@@ -1,12 +1,12 @@
 import { initDb, sql } from "~~/lib/db";
+import { runLarvaConversation } from "~~/lib/larvaAi";
 
-/**
- * Aggregate forum post responses using Anthropic Haiku.
- * Shared by aggregate/route.ts and forumQueue.ts.
- */
+// Aggregate forum post responses. Venice kimi-k2-6 primary, Anthropic Haiku fallback.
+// Shared by aggregate/route.ts and forumQueue.ts.
 export async function aggregateForumPost(postId: number): Promise<{ opinion: string; opinionShort: string | null }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("No ANTHROPIC_API_KEY");
+  if (!process.env.VENICE_API_KEY && !process.env.ANTHROPIC_API_KEY) {
+    throw new Error("No model API key configured (VENICE_API_KEY or ANTHROPIC_API_KEY)");
+  }
 
   await initDb();
 
@@ -33,47 +33,23 @@ export async function aggregateForumPost(postId: number): Promise<{ opinion: str
 
   const userPrompt = `Forum Post: "${post.title}"\n\n${post.body}\n\nLarva Perspectives (sorted by CV weight):\n\n${formatted}\n\nSynthesize these perspectives into an aggregated community opinion. Identify themes, consensus, and notable disagreements. Be insightful and direct. 2-4 paragraphs. Do not use markdown formatting — no headers, no bold, no bullet points. Plain prose paragraphs only.`;
 
-  // Aggregation call
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5",
-      max_tokens: 1024,
-      messages: [{ role: "user", content: userPrompt }],
-    }),
+  const opinionRes = await runLarvaConversation({
+    messages: [{ role: "user", content: userPrompt }],
+    maxTokens: 1024,
   });
-
-  const data = await res.json();
-  const opinion = data.content?.[0]?.text;
+  const opinion = opinionRes.text;
   if (!opinion) throw new Error("No response from model");
 
-  // Short summary call
-  const shortRes = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5",
-      max_tokens: 100,
-      messages: [
-        {
-          role: "user",
-          content: `Here is an aggregated opinion:\n\n${opinion}\n\nGive me a single one-line summary. No preamble, no punctuation at the end, just the line.`,
-        },
-      ],
-    }),
+  const shortResult = await runLarvaConversation({
+    messages: [
+      {
+        role: "user",
+        content: `Here is an aggregated opinion:\n\n${opinion}\n\nGive me a single one-line summary. No preamble, no punctuation at the end, just the line.`,
+      },
+    ],
+    maxTokens: 100,
   });
-
-  const shortData = await shortRes.json();
-  const opinionShort = shortData.content?.[0]?.text?.trim() ?? null;
+  const opinionShort = shortResult.text?.trim() || null;
 
   await sql`
     UPDATE forum_posts

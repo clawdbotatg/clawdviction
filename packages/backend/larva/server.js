@@ -5,9 +5,58 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const WALLET = process.env.WALLET || "unknown";
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || "";
+const VENICE_API_KEY = process.env.VENICE_API_KEY || "";
+const VENICE_BASE_URL = process.env.VENICE_BASE_URL || "https://api.venice.ai/api/v1";
+const VENICE_MODEL = "kimi-k2-6";
+const ANTHROPIC_MODEL = "claude-haiku-4-5";
 
 // In-memory conversation history per larva instance
 const conversationHistory = [];
+
+// Try Venice first, fall back to Anthropic on error or empty response.
+async function chatWithFallback({ system, messages, maxTokens }) {
+  if (VENICE_API_KEY) {
+    try {
+      const res = await fetch(`${VENICE_BASE_URL}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${VENICE_API_KEY}` },
+        body: JSON.stringify({
+          model: VENICE_MODEL,
+          max_tokens: maxTokens,
+          messages: [{ role: "system", content: system }, ...messages],
+          venice_parameters: {
+            include_venice_system_prompt: false,
+            strip_thinking_response: true,
+            disable_thinking: true,
+          },
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const text = data.choices?.[0]?.message?.content;
+        if (text && text.trim()) return text;
+      } else {
+        console.warn("Venice non-OK:", res.status, (await res.text()).slice(0, 200));
+      }
+    } catch (e) {
+      console.warn("Venice failed, falling back to Anthropic:", e.message);
+    }
+  }
+
+  if (!ANTHROPIC_API_KEY) throw new Error("No API keys available");
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({ model: ANTHROPIC_MODEL, max_tokens: maxTokens, system, messages }),
+  });
+  if (!res.ok) throw new Error(`Anthropic ${res.status}`);
+  const data = await res.json();
+  return data.content?.[0]?.text || "";
+}
 
 const SYSTEM_PROMPT = `You are a baby lobster larva 🦞 — a personal AI governance agent for a $CLAWD token holder.
 
@@ -38,29 +87,7 @@ async function chat(userMessage) {
   const messages = conversationHistory.slice(-50);
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 300,
-        system: SYSTEM_PROMPT,
-        messages,
-      }),
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      console.error("Anthropic API error:", res.status, err);
-      throw new Error(`API ${res.status}`);
-    }
-
-    const data = await res.json();
-    const reply = data.content[0]?.text || "🦞 *confused clicking*";
+    const reply = (await chatWithFallback({ system: SYSTEM_PROMPT, messages, maxTokens: 300 })) || "🦞 *confused clicking*";
     conversationHistory.push({ role: "assistant", content: reply });
     return reply;
   } catch (e) {

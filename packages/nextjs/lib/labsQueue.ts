@@ -1,5 +1,6 @@
 import { compressMemory, initDb, sql } from "~~/lib/db";
 import { aggregateLabsIdea } from "~~/lib/labsAggregate";
+import { runLarvaConversation } from "~~/lib/larvaAi";
 import { formatAnswersAsQA } from "~~/lib/questions";
 
 function buildLabsSystemPrompt(
@@ -46,8 +47,9 @@ Holder wallet: ${wallet}`;
 export async function processLabsQueue(
   limit = 10,
 ): Promise<{ processed: number; results: { wallet: string; response: string }[] }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("No ANTHROPIC_API_KEY");
+  if (!process.env.VENICE_API_KEY && !process.env.ANTHROPIC_API_KEY) {
+    throw new Error("No model API key configured (VENICE_API_KEY or ANTHROPIC_API_KEY)");
+  }
 
   await initDb();
 
@@ -82,7 +84,6 @@ export async function processLabsQueue(
   }
 
   const results: { wallet: string; response: string }[] = [];
-  const anthropicUrl = "https://api.anthropic.com/v1/messages";
 
   for (const item of pending.rows) {
     try {
@@ -136,22 +137,12 @@ export async function processLabsQueue(
 
       const userMessage = `BUILD IDEA: "${item.title}"\n\n${item.description}\n\nAs this holder's larva, share your perspective on this build idea — representing their values and priorities. Remember: you are the larva (AI agent), not the human. 2-4 sentences.`;
 
-      const response = await fetch(anthropicUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: "claude-haiku-4-5",
-          max_tokens: 800,
-          messages: [{ role: "user", content: `${systemPrompt}\n\n${userMessage}` }],
-        }),
+      const result = await runLarvaConversation({
+        system: systemPrompt,
+        messages: [{ role: "user", content: userMessage }],
+        maxTokens: 800,
       });
-
-      const data = await response.json();
-      const text = data.content?.[0]?.text || "";
+      const text = result.text;
 
       await sql`
         INSERT INTO labs_responses (idea_id, wallet, response)

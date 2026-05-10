@@ -1,5 +1,6 @@
 import { compressMemory, initDb, sql } from "~~/lib/db";
 import { aggregateForumPost } from "~~/lib/forumAggregate";
+import { runLarvaConversation } from "~~/lib/larvaAi";
 import { formatAnswersAsQA } from "~~/lib/questions";
 
 function buildForumSystemPrompt(
@@ -51,8 +52,9 @@ Holder wallet: ${wallet}`;
 export async function processForumQueue(
   limit = 10,
 ): Promise<{ processed: number; results: { wallet: string; response: string }[] }> {
-  const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
-  if (!anthropicApiKey) throw new Error("No ANTHROPIC_API_KEY");
+  if (!process.env.VENICE_API_KEY && !process.env.ANTHROPIC_API_KEY) {
+    throw new Error("No model API key configured (VENICE_API_KEY or ANTHROPIC_API_KEY)");
+  }
 
   await initDb();
 
@@ -144,35 +146,15 @@ export async function processForumQueue(
 
       const userMessage = `FORUM POST: "${item.title}"\n\n${item.body}\n\nAs this holder's larva, share your perspective on this post — representing their values and priorities. Remember: you are the larva (AI agent), not the human. 2-4 sentences.`;
 
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": anthropicApiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: "claude-haiku-4-5",
-          max_tokens: 800,
-          system: systemPrompt,
-          messages: [{ role: "user", content: userMessage }],
-        }),
-        signal: AbortSignal.timeout(30000),
+      const result = await runLarvaConversation({
+        system: systemPrompt,
+        messages: [{ role: "user", content: userMessage }],
+        maxTokens: 800,
+        timeoutMs: 30000,
       });
-
-      if (!response.ok) {
-        const errBody = await response.text().catch(() => "");
-        throw new Error(`Anthropic API error ${response.status}: ${errBody}`);
-      }
-
-      const data = await response.json();
-      if (data.error) {
-        throw new Error(`Anthropic API error: ${data.error.message || JSON.stringify(data.error)}`);
-      }
-
-      const text = data.content?.[0]?.text;
-      if (!text || typeof text !== "string" || text.trim().length === 0) {
-        throw new Error("Anthropic returned empty response — no content in response body");
+      const text = result.text;
+      if (!text || text.trim().length === 0) {
+        throw new Error("Model returned empty response — no content");
       }
 
       await sql`
