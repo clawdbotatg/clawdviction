@@ -35,11 +35,20 @@ export type LarvaRunResult = {
 };
 
 export async function runLarvaConversation(opts: LarvaRunOptions): Promise<LarvaRunResult> {
+  // Use console.warn for the success line so it reliably surfaces in Vercel's
+  // indexed runtime logs (info-level console.log was getting dropped from
+  // searchable history).
+  console.warn("[larvaAi] runLarvaConversation called", {
+    veniceKey: !!process.env.VENICE_API_KEY,
+    anthropicKey: !!process.env.ANTHROPIC_API_KEY,
+    hasTools: !!opts.tools?.length,
+  });
+
   if (process.env.VENICE_API_KEY) {
     try {
       const text = await runVenice(opts);
       if (text && text.trim()) {
-        console.log("[larvaAi] provider=venice");
+        console.warn("[larvaAi] provider=venice");
         return { text, provider: "venice" };
       }
       console.warn("[larvaAi] Venice returned empty content — falling back to Anthropic");
@@ -49,7 +58,7 @@ export async function runLarvaConversation(opts: LarvaRunOptions): Promise<Larva
   }
 
   const text = await runAnthropic(opts);
-  console.log("[larvaAi] provider=anthropic");
+  console.warn("[larvaAi] provider=anthropic");
   return { text, provider: "anthropic" };
 }
 
