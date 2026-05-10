@@ -466,21 +466,23 @@ export async function POST(request: NextRequest) {
     if (dbOk) {
       try {
         // Materialize pending accrual + deduct atomically in one statement.
-        // The WHERE clause ensures we only update if materialized balance >= SEND_THRESHOLD.
+        // FLOOR each accrual delta — the balance/total_earned columns have an
+        // integer check constraint and (accrual_rate * elapsed) / DIVISOR
+        // produces fractional numerics. Per-call truncation loses < 1 unit.
         const deducted = await sql`
           UPDATE clawdviction_balances
           SET
             balance = balance
-              + (accrual_rate * EXTRACT(EPOCH FROM (NOW() - last_accrued_at))::bigint) / ${DIVISOR.toString()}::numeric
+              + FLOOR((accrual_rate * EXTRACT(EPOCH FROM (NOW() - last_accrued_at))::bigint) / ${DIVISOR.toString()}::numeric)
               - ${CHAT_COST.toString()}::numeric,
             total_spent = total_spent + ${CHAT_COST.toString()}::numeric,
             total_earned = total_earned
-              + (accrual_rate * EXTRACT(EPOCH FROM (NOW() - last_accrued_at))::bigint) / ${DIVISOR.toString()}::numeric,
+              + FLOOR((accrual_rate * EXTRACT(EPOCH FROM (NOW() - last_accrued_at))::bigint) / ${DIVISOR.toString()}::numeric),
             last_accrued_at = NOW()
           WHERE wallet = ${wallet.toLowerCase()}
             AND (
               balance
-              + (accrual_rate * GREATEST(EXTRACT(EPOCH FROM (NOW() - last_accrued_at))::bigint, 0)) / ${DIVISOR.toString()}::numeric
+              + FLOOR((accrual_rate * GREATEST(EXTRACT(EPOCH FROM (NOW() - last_accrued_at))::bigint, 0)) / ${DIVISOR.toString()}::numeric)
             ) >= ${SEND_THRESHOLD.toString()}::numeric
           RETURNING balance`;
 
