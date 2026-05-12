@@ -3,7 +3,7 @@ import { initDb, sql } from "~~/lib/db";
 import { aggregateForumPost } from "~~/lib/forumAggregate";
 import { processForumQueue } from "~~/lib/forumQueue";
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
