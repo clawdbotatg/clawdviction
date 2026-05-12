@@ -1,15 +1,14 @@
 import { initDb, sql } from "~~/lib/db";
 
 /**
- * Aggregate governance proposal responses using Venice AI.
+ * Aggregate governance proposal responses using Anthropic Haiku.
  * Shared by api/gov/[id]/aggregate/route.ts and the gov-process cron.
  */
 export async function aggregateGovProposal(
   proposalId: number,
 ): Promise<{ opinion: string; opinionShort: string | null }> {
-  const apiKey = process.env.VENICE_API_KEY;
-  const baseUrl = process.env.VENICE_BASE_URL || "https://api.venice.ai/api/v1";
-  if (!apiKey) throw new Error("No VENICE_API_KEY");
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("No ANTHROPIC_API_KEY");
 
   await initDb();
 
@@ -58,33 +57,36 @@ Identify the dominant themes, areas of consensus, notable disagreements, and for
 
   const userPrompt = `Proposal: "${proposal.title}"\nQuestion: ${proposal.question}\n\nResponses (sorted by CV weight, highest first):\n\n${formatted}\n\n${proposal.type === "vote" ? "Form a ruling based on these votes." : "Form an aggregated community opinion from these comments."}`;
 
-  const res = await fetch(`${baseUrl}/chat/completions`, {
+  // Aggregation call
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "zai-org-glm-5",
-      max_tokens: 800,
-      messages: [{ role: "user", content: systemPrompt + "\n\n" + userPrompt }],
-      venice_parameters: { include_venice_system_prompt: false, strip_thinking_response: true },
+      model: "claude-haiku-4-5",
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
     }),
   });
 
   const data = await res.json();
-  const opinion = data.choices?.[0]?.message?.content;
-  if (!opinion) throw new Error("No response from Venice model");
+  const opinion = data.content?.[0]?.text;
+  if (!opinion) throw new Error("No response from Haiku model");
 
   // One-line summary
-  const shortRes = await fetch(`${baseUrl}/chat/completions`, {
+  const shortRes = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "zai-org-glm-5",
+      model: "claude-haiku-4-5",
       max_tokens: 100,
       messages: [
         {
@@ -92,12 +94,11 @@ Identify the dominant themes, areas of consensus, notable disagreements, and for
           content: `Here is a governance analysis:\n\n${opinion}\n\nGive me a single one-line answer that captures the bottom line. No preamble, no punctuation at the end, just the line.`,
         },
       ],
-      venice_parameters: { include_venice_system_prompt: false, strip_thinking_response: true },
     }),
   });
 
   const shortData = await shortRes.json();
-  const opinionShort = shortData.choices?.[0]?.message?.content?.trim() ?? null;
+  const opinionShort = shortData.content?.[0]?.text?.trim() ?? null;
 
   await sql`
     UPDATE governance_proposals
