@@ -3,7 +3,7 @@ import { initDb, sql } from "~~/lib/db";
 import { aggregateLabsIdea } from "~~/lib/labsAggregate";
 import { processLabsQueue } from "~~/lib/labsQueue";
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 async function handleProcess(request: NextRequest) {
   try {
