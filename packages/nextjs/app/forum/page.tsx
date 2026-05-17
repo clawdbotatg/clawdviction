@@ -76,7 +76,10 @@ const ForumPage: NextPage = () => {
                         {p.reply_count !== 1 ? "ies" : "y"}
                       </p>
                       {p.aggregated_opinion_short && (
-                        <p className="text-xs text-info mt-1 italic">🧠 {p.aggregated_opinion_short}</p>
+                        <p className="text-base font-medium text-base-content mt-2 leading-snug border-l-2 border-info pl-3">
+                          <span className="opacity-70 mr-1">🧠</span>
+                          {p.aggregated_opinion_short}
+                        </p>
                       )}
                     </div>
                     <Link href={`/forum/${p.id}`} className="btn btn-ghost btn-sm">

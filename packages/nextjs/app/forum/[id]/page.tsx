@@ -229,7 +229,9 @@ export default function ForumPostPage({ params }: { params: Promise<{ id: string
               {post.aggregated_opinion ? (
                 <div className="mt-2">
                   {post.aggregated_opinion_short && (
-                    <p className="text-sm font-semibold text-info mb-2">{post.aggregated_opinion_short}</p>
+                    <p className="text-lg font-semibold text-base-content mb-3 leading-snug border-l-2 border-info pl-3">
+                      {post.aggregated_opinion_short}
+                    </p>
                   )}
                   <p className="whitespace-pre-wrap text-sm">{post.aggregated_opinion}</p>
                 </div>
