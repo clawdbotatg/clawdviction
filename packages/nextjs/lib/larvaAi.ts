@@ -60,12 +60,14 @@ async function runVenice(opts: LarvaRunOptions): Promise<string> {
   if (!apiKey) throw new Error("VENICE_API_KEY not set");
 
   const maxRounds = opts.maxToolRounds ?? 3;
-  // kimi-k2-6 burns ~1500 tokens on internal reasoning even when venice_parameters
-  // include disable_thinking:true (Venice bug as of 2026-05-20). Floor the budget
-  // so callers never starve the model and get back empty content + finish_reason:"length".
-  const maxTokens = Math.max(opts.maxTokens ?? 2000, 2500);
+  // kimi-k2-6 ignores venice_parameters.disable_thinking and burns 1200-2400+ tokens
+  // on hidden reasoning before emitting content (Venice bug as of 2026-05-20). At 2500
+  // we still saw ~33% empty-with-finish_reason:"length". Floor at 4000 to leave room
+  // for the visible reply after thinking finishes.
+  const maxTokens = Math.max(opts.maxTokens ?? 2000, 4000);
   const maxToolResult = opts.maxToolResultLength ?? 3000;
-  const timeoutMs = opts.timeoutMs ?? 25000;
+  // 4000-token generations frequently take 30-45s. 25s was firing AbortSignal mid-stream.
+  const timeoutMs = opts.timeoutMs ?? 60000;
 
   const tools = opts.tools?.map(t => ({
     type: "function" as const,
