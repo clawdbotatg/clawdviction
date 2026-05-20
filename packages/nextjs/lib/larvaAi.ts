@@ -66,8 +66,9 @@ async function runVenice(opts: LarvaRunOptions): Promise<string> {
   // for the visible reply after thinking finishes.
   const maxTokens = Math.max(opts.maxTokens ?? 2000, 4000);
   const maxToolResult = opts.maxToolResultLength ?? 3000;
-  // 4000-token generations frequently take 30-45s. 25s was firing AbortSignal mid-stream.
-  const timeoutMs = opts.timeoutMs ?? 60000;
+  // Real prompts (long memory + 30 msg chat context) push kimi-k2-6 to 60-100s per call.
+  // 60s default was still timing out in production after the 4000-token bump.
+  const timeoutMs = opts.timeoutMs ?? 120000;
 
   const tools = opts.tools?.map(t => ({
     type: "function" as const,

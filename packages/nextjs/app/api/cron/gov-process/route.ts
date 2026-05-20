@@ -4,7 +4,7 @@ import { aggregateGovProposal } from "~~/lib/govAggregate";
 import { errMsg, logLarvaError } from "~~/lib/larvaErrors";
 import { QueueItem, processQueueItem } from "~~/lib/processQueueItem";
 
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
       JOIN governance_proposals p ON p.id = q.proposal_id
       WHERE q.status = 'pending'
       ORDER BY q.created_at ASC
-      LIMIT 10`;
+      LIMIT 2`;
 
     const results: { wallet: string; response: string }[] = [];
 

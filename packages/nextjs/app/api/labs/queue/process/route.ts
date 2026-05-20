@@ -3,7 +3,7 @@ import { initDb, sql } from "~~/lib/db";
 import { aggregateLabsIdea } from "~~/lib/labsAggregate";
 import { processLabsQueue } from "~~/lib/labsQueue";
 
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 async function handleProcess(request: NextRequest) {
   try {
@@ -20,7 +20,7 @@ async function handleProcess(request: NextRequest) {
     // item still in 'processing' at the start of the next run is dead.
     await sql`UPDATE labs_queue SET status = 'pending' WHERE status = 'processing'`;
 
-    const { processed, results } = await processLabsQueue(10);
+    const { processed, results } = await processLabsQueue(2);
 
     // Auto-aggregate: find ideas with all responses done but no aggregated opinion
     const needsAggregation = await sql`

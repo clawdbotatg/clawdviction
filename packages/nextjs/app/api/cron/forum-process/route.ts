@@ -4,7 +4,7 @@ import { aggregateForumPost } from "~~/lib/forumAggregate";
 import { processForumQueue } from "~~/lib/forumQueue";
 import { errMsg, logLarvaError } from "~~/lib/larvaErrors";
 
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     // item still in 'processing' at the start of the next run is dead.
     await sql`UPDATE forum_queue SET status = 'pending' WHERE status = 'processing'`;
 
-    const { processed } = await processForumQueue(10);
+    const { processed } = await processForumQueue(2);
 
     // Auto-aggregate: find posts with all responses done but no aggregated opinion
     const needsAggregation = await sql`
