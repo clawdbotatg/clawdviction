@@ -60,7 +60,10 @@ async function runVenice(opts: LarvaRunOptions): Promise<string> {
   if (!apiKey) throw new Error("VENICE_API_KEY not set");
 
   const maxRounds = opts.maxToolRounds ?? 3;
-  const maxTokens = opts.maxTokens ?? 2000;
+  // kimi-k2-6 burns ~1500 tokens on internal reasoning even when venice_parameters
+  // include disable_thinking:true (Venice bug as of 2026-05-20). Floor the budget
+  // so callers never starve the model and get back empty content + finish_reason:"length".
+  const maxTokens = Math.max(opts.maxTokens ?? 2000, 2500);
   const maxToolResult = opts.maxToolResultLength ?? 3000;
   const timeoutMs = opts.timeoutMs ?? 25000;
 
