@@ -1,13 +1,13 @@
 import { initDb, sql } from "~~/lib/db";
 import { runLarvaConversation } from "~~/lib/larvaAi";
 
-// Aggregate governance proposal responses via the shared larva model (Venice kimi-k2-6).
+// Aggregate governance proposal responses via the shared larva model (BANKR claude-sonnet-4.6).
 // Shared by api/gov/[id]/aggregate/route.ts and the gov-process cron.
 export async function aggregateGovProposal(
   proposalId: number,
 ): Promise<{ opinion: string; opinionShort: string | null }> {
-  if (!process.env.VENICE_API_KEY) {
-    throw new Error("No VENICE_API_KEY");
+  if (!process.env.BANKR_API_KEY) {
+    throw new Error("No BANKR_API_KEY");
   }
 
   await initDb();

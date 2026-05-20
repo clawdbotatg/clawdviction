@@ -1,14 +1,15 @@
-// Larva model wrapper — Venice kimi-k2-6 (OpenAI-compatible /chat/completions),
-// tool-use loop included. Anthropic was removed 2026-05-20; all larva inference
-// flows through Venice now.
+// Larva model wrapper — BANKR-proxied Anthropic (claude-sonnet-4.6).
+// Switched from Venice kimi-k2-6 on 2026-05-20 after Venice's broken
+// disable_thinking flag caused widespread empty responses + timeouts on
+// forum-queue. BANKR proxies Anthropic Messages API at llm.bankr.bot
+// with X-API-Key auth.
 
-const VENICE_BASE = process.env.VENICE_BASE_URL || "https://api.venice.ai/api/v1";
-const VENICE_MODEL = "kimi-k2-6";
+const BANKR_BASE = process.env.BANKR_BASE_URL || "https://llm.bankr.bot";
+const BANKR_MODEL = process.env.BANKR_MODEL || "claude-sonnet-4.6";
 
 export type LarvaTool = {
   name: string;
   description: string;
-  // JSON Schema for the tool's arguments object.
   parameters: { type: "object"; properties: Record<string, unknown>; required: string[] };
   execute: (args: Record<string, unknown>) => Promise<string>;
 };
@@ -28,114 +29,105 @@ export type LarvaRunOptions = {
 
 export type LarvaRunResult = {
   text: string;
-  provider: "venice";
+  provider: "bankr";
 };
 
 export async function runLarvaConversation(opts: LarvaRunOptions): Promise<LarvaRunResult> {
-  // Warn-level so the line surfaces in Vercel's indexed runtime logs.
-  console.warn("[larvaAi] runLarvaConversation called", {
-    veniceKey: !!process.env.VENICE_API_KEY,
-    hasTools: !!opts.tools?.length,
-  });
-
-  if (!process.env.VENICE_API_KEY) {
-    throw new Error("VENICE_API_KEY not set");
+  if (!process.env.BANKR_API_KEY) {
+    throw new Error("BANKR_API_KEY not set");
   }
-
-  const text = await runVenice(opts);
-  console.warn("[larvaAi] provider=venice");
-  return { text, provider: "venice" };
+  const text = await runBankr(opts);
+  return { text, provider: "bankr" };
 }
 
-/* ---------- Venice (OpenAI-compatible) ---------- */
+/* ---------- BANKR / Anthropic Messages API ---------- */
 
-type OpenAIToolCall = { id: string; type: "function"; function: { name: string; arguments: string } };
-type OpenAIMessage =
-  | { role: "system" | "user"; content: string }
-  | { role: "assistant"; content: string | null; tool_calls?: OpenAIToolCall[] }
-  | { role: "tool"; tool_call_id: string; content: string };
+type AnthropicTextBlock = { type: "text"; text: string };
+type AnthropicToolUseBlock = { type: "tool_use"; id: string; name: string; input: Record<string, unknown> };
+type AnthropicToolResultBlock = {
+  type: "tool_result";
+  tool_use_id: string;
+  content: string;
+  is_error?: boolean;
+};
+type AnthropicAssistantContent = AnthropicTextBlock | AnthropicToolUseBlock;
+type AnthropicMessage =
+  | { role: "user"; content: string | AnthropicToolResultBlock[] }
+  | { role: "assistant"; content: AnthropicAssistantContent[] };
 
-async function runVenice(opts: LarvaRunOptions): Promise<string> {
-  const apiKey = process.env.VENICE_API_KEY;
-  if (!apiKey) throw new Error("VENICE_API_KEY not set");
+async function runBankr(opts: LarvaRunOptions): Promise<string> {
+  const apiKey = process.env.BANKR_API_KEY;
+  if (!apiKey) throw new Error("BANKR_API_KEY not set");
 
   const maxRounds = opts.maxToolRounds ?? 3;
-  // kimi-k2-6 ignores venice_parameters.disable_thinking and burns 1200-2400+ tokens
-  // on hidden reasoning before emitting content (Venice bug as of 2026-05-20). At 2500
-  // we still saw ~33% empty-with-finish_reason:"length". Floor at 4000 to leave room
-  // for the visible reply after thinking finishes.
-  const maxTokens = Math.max(opts.maxTokens ?? 2000, 4000);
+  const maxTokens = opts.maxTokens ?? 1024;
   const maxToolResult = opts.maxToolResultLength ?? 3000;
-  // Real prompts (long memory + 30 msg chat context) push kimi-k2-6 to 60-100s per call.
-  // 60s default was still timing out in production after the 4000-token bump.
-  const timeoutMs = opts.timeoutMs ?? 120000;
+  const timeoutMs = opts.timeoutMs ?? 60000;
 
   const tools = opts.tools?.map(t => ({
-    type: "function" as const,
-    function: { name: t.name, description: t.description, parameters: t.parameters },
+    name: t.name,
+    description: t.description,
+    input_schema: t.parameters,
   }));
   const toolMap = new Map(opts.tools?.map(t => [t.name, t]) ?? []);
 
-  const messages: OpenAIMessage[] = [
-    ...(opts.system ? [{ role: "system" as const, content: opts.system }] : []),
-    ...opts.messages.map(m => ({ role: m.role, content: m.content }) as OpenAIMessage),
-  ];
+  const messages: AnthropicMessage[] = opts.messages.map(m => ({
+    role: m.role,
+    content: m.role === "assistant" ? [{ type: "text", text: m.content }] : m.content,
+  })) as AnthropicMessage[];
 
   for (let round = 0; round < maxRounds; round++) {
-    const res = await fetch(`${VENICE_BASE}/chat/completions`, {
+    const res = await fetch(`${BANKR_BASE}/v1/messages`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      headers: { "Content-Type": "application/json", "X-API-Key": apiKey },
       body: JSON.stringify({
-        model: VENICE_MODEL,
+        model: BANKR_MODEL,
         max_tokens: maxTokens,
+        ...(opts.system ? { system: opts.system } : {}),
         messages,
         ...(tools ? { tools } : {}),
-        venice_parameters: {
-          include_venice_system_prompt: false,
-          strip_thinking_response: true,
-          // Without this, kimi-k2-6 spends the entire max_tokens budget on internal reasoning
-          // and returns empty content with finish_reason: "length".
-          disable_thinking: true,
-        },
       }),
       signal: AbortSignal.timeout(timeoutMs),
     });
 
     if (!res.ok) {
       const body = await res.text();
-      throw new Error(`Venice HTTP ${res.status}: ${body.slice(0, 300)}`);
+      throw new Error(`BANKR HTTP ${res.status}: ${body.slice(0, 300)}`);
     }
     const data = await res.json();
-    const choice = data.choices?.[0];
-    if (!choice) throw new Error("Venice: no choices in response");
+    const content: AnthropicAssistantContent[] = Array.isArray(data.content) ? data.content : [];
+    const stopReason: string | undefined = data.stop_reason;
 
-    const msg = choice.message ?? {};
-    const finish: string | undefined = choice.finish_reason;
-    const toolCalls: OpenAIToolCall[] | undefined = msg.tool_calls;
-
-    if (Array.isArray(toolCalls) && toolCalls.length > 0 && finish === "tool_calls") {
-      messages.push({ role: "assistant", content: msg.content ?? null, tool_calls: toolCalls });
-      for (const call of toolCalls) {
-        const tool = toolMap.get(call.function.name);
+    if (stopReason === "tool_use") {
+      messages.push({ role: "assistant", content });
+      const toolResults: AnthropicToolResultBlock[] = [];
+      for (const block of content) {
+        if (block.type !== "tool_use") continue;
+        const tool = toolMap.get(block.name);
         let result: string;
+        let isError = false;
         if (!tool) {
-          result = JSON.stringify({ error: `unknown tool ${call.function.name}` });
+          result = JSON.stringify({ error: `unknown tool ${block.name}` });
+          isError = true;
         } else {
-          let parsed: Record<string, unknown> = {};
           try {
-            parsed = JSON.parse(call.function.arguments || "{}");
-          } catch {
-            /* ignore */
+            result = await tool.execute(block.input ?? {});
+          } catch (e) {
+            result = JSON.stringify({ error: e instanceof Error ? e.message : String(e) });
+            isError = true;
           }
-          result = await tool.execute(parsed);
         }
         if (result.length > maxToolResult) result = result.slice(0, maxToolResult) + "… [truncated]";
-        messages.push({ role: "tool", tool_call_id: call.id, content: result });
+        toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result, is_error: isError });
       }
+      messages.push({ role: "user", content: toolResults });
       continue;
     }
 
-    return typeof msg.content === "string" ? msg.content : "";
+    return content
+      .filter((b): b is AnthropicTextBlock => b.type === "text")
+      .map(b => b.text)
+      .join("");
   }
   return "";
 }
