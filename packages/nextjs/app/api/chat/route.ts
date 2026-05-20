@@ -5,6 +5,7 @@ import { base } from "viem/chains";
 import { compressMemory, initDb, isDbAvailable, sql } from "~~/lib/db";
 import { LarvaTool, runLarvaConversation } from "~~/lib/larvaAi";
 import { LARVA_BASE_PROMPT } from "~~/lib/larvaContext";
+import { errMsg, logLarvaError } from "~~/lib/larvaErrors";
 import { CHAT_MAX_LENGTH, formatAnswersAsQA } from "~~/lib/questions";
 import { verifyAuth } from "~~/lib/verifyAuth";
 
@@ -356,32 +357,61 @@ async function executeToolCall(name: string, input: Record<string, unknown>): Pr
 }
 
 export async function POST(request: NextRequest) {
+  let walletForLog: string | null = null;
   try {
     const verified = await verifyAuth(request);
-    if (!verified) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!verified) {
+      await logLarvaError({ surface: "chat", errorType: "auth", statusCode: 401, message: "verifyAuth failed" });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const { wallet: rawWallet, message, messages: clientMessages } = await request.json();
 
     if (!rawWallet || !message) {
+      await logLarvaError({
+        surface: "chat",
+        errorType: "bad_request",
+        wallet: verified,
+        statusCode: 400,
+        message: "missing wallet or message",
+      });
       return NextResponse.json({ error: "Missing wallet or message" }, { status: 400 });
     }
 
     const wallet = rawWallet.toLowerCase();
+    walletForLog = wallet;
 
     if (typeof message !== "string" || message.length > CHAT_MAX_LENGTH) {
+      await logLarvaError({
+        surface: "chat",
+        errorType: "bad_request",
+        wallet,
+        statusCode: 400,
+        message: `message too long: ${typeof message === "string" ? message.length : typeof message}`,
+      });
       return NextResponse.json({ error: `Message too long (max ${CHAT_MAX_LENGTH} characters)` }, { status: 400 });
     }
 
     if (verified !== wallet) {
+      await logLarvaError({
+        surface: "chat",
+        errorType: "auth",
+        wallet,
+        statusCode: 401,
+        message: "signed wallet does not match body wallet",
+        context: { signed: verified },
+      });
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Rate limit check — BEFORE CV deduction (#16)
     if (!checkRateLimit(wallet)) {
+      await logLarvaError({ surface: "chat", errorType: "rate_limit", wallet, statusCode: 429 });
       return NextResponse.json({ error: "Rate limited — max 10 messages per minute. Slow down! 🦞" }, { status: 429 });
     }
 
     if (!process.env.VENICE_API_KEY && !process.env.ANTHROPIC_API_KEY) {
+      await logLarvaError({ surface: "chat", errorType: "config", wallet, statusCode: 500, message: "no API keys" });
       return NextResponse.json({ error: "API key not configured" }, { status: 500 });
     }
 
@@ -488,10 +518,17 @@ export async function POST(request: NextRequest) {
 
         if (deducted.rows.length === 0) {
           // Either wallet not found or insufficient CV — either way, reject
+          await logLarvaError({ surface: "chat", errorType: "insufficient_cv", wallet, statusCode: 402 });
           return NextResponse.json({ error: "Insufficient CV — need 1M to chat" }, { status: 402 });
         }
       } catch (e) {
         console.error("CV atomic deduction error:", e);
+        await logLarvaError({
+          surface: "chat",
+          errorType: "db_error",
+          wallet,
+          message: `CV deduction: ${errMsg(e)}`,
+        });
         // Fail open — the user message INSERT below (outside this try/catch) handles saving
       }
 
@@ -538,10 +575,17 @@ export async function POST(request: NextRequest) {
         assistantMessage = result.text;
       } else {
         console.error("Larva: empty content from", result.provider);
+        await logLarvaError({
+          surface: "chat",
+          errorType: "model_empty",
+          wallet,
+          context: { provider: result.provider },
+        });
         assistantMessage = "🦞 *clicks claws nervously* — try again?";
       }
     } catch (e) {
       console.error("Larva model error:", e instanceof Error ? e.message : e);
+      await logLarvaError({ surface: "chat", errorType: "model_error", wallet, message: errMsg(e) });
       assistantMessage = "🦞 Something went wrong on my end. Try again soon.";
     }
 
@@ -588,6 +632,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: assistantMessage });
   } catch (error) {
     console.error("Chat error:", error);
+    await logLarvaError({
+      surface: "chat",
+      errorType: "internal",
+      wallet: walletForLog,
+      statusCode: 500,
+      message: errMsg(error),
+    });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

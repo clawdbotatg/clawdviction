@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initDb, sql } from "~~/lib/db";
 import { aggregateGovProposal } from "~~/lib/govAggregate";
+import { errMsg, logLarvaError } from "~~/lib/larvaErrors";
 import { QueueItem, processQueueItem } from "~~/lib/processQueueItem";
 
 export const maxDuration = 120;
@@ -40,6 +41,13 @@ export async function GET(request: NextRequest) {
           results.push(result.value);
         } else {
           console.error(`Queue processing error for item ${item.id}:`, result.reason);
+          await logLarvaError({
+            surface: "gov-queue",
+            errorType: "model_error",
+            wallet: item.wallet,
+            message: errMsg(result.reason),
+            context: { queueItemId: item.id, proposalId: item.proposal_id, type: item.type, cron: true },
+          });
           await sql`UPDATE governance_queue SET status = 'failed' WHERE id = ${item.id}`;
         }
       }
@@ -66,12 +74,25 @@ export async function GET(request: NextRequest) {
         console.log(`Auto-aggregated gov proposal ${row.id}`);
       } catch (e) {
         console.error(`Auto-aggregate failed for proposal ${row.id}:`, e);
+        await logLarvaError({
+          surface: "gov-agg",
+          errorType: "model_error",
+          message: errMsg(e),
+          context: { proposalId: row.id, cron: true },
+        });
       }
     }
 
     return NextResponse.json({ processed: results.length, aggregated });
   } catch (error) {
     console.error("Cron gov-process error:", error);
+    await logLarvaError({
+      surface: "gov-queue",
+      errorType: "internal",
+      statusCode: 500,
+      message: errMsg(error),
+      context: { cron: true },
+    });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }

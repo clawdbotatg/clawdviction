@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
 import { Address, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
@@ -109,9 +110,14 @@ const AdminPage: NextPage = () => {
     <div className="flex flex-col flex-grow px-4 py-6 max-w-7xl mx-auto w-full">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-error">🦀 Admin Dashboard</h1>
-        <button className="btn btn-sm btn-outline" onClick={fetchStats} disabled={loading}>
-          {loading ? <span className="loading loading-spinner loading-sm" /> : "🔄 Refresh"}
-        </button>
+        <div className="flex gap-2">
+          <Link href="/admin/errors" className="btn btn-sm btn-outline">
+            🚨 Errors
+          </Link>
+          <button className="btn btn-sm btn-outline" onClick={fetchStats} disabled={loading}>
+            {loading ? <span className="loading loading-spinner loading-sm" /> : "🔄 Refresh"}
+          </button>
+        </div>
       </div>
 
       {error && <div className="alert alert-error mb-4">{error}</div>}

@@ -1,6 +1,7 @@
 import { compressMemory, initDb, sql } from "~~/lib/db";
 import { aggregateLabsIdea } from "~~/lib/labsAggregate";
 import { runLarvaConversation } from "~~/lib/larvaAi";
+import { errMsg, logLarvaError } from "~~/lib/larvaErrors";
 import { formatAnswersAsQA } from "~~/lib/questions";
 
 function buildLabsSystemPrompt(
@@ -159,12 +160,25 @@ export async function processLabsQueue(
           await aggregateLabsIdea(item.idea_id);
         } catch (e) {
           console.error(`Auto-aggregate failed for idea ${item.idea_id}:`, e);
+          await logLarvaError({
+            surface: "labs-agg",
+            errorType: "model_error",
+            message: errMsg(e),
+            context: { ideaId: item.idea_id, autoTriggered: true },
+          });
         }
       }
 
       results.push({ wallet: item.wallet, response: text });
     } catch (e) {
       console.error(`Labs queue processing error for item ${item.id}:`, e);
+      await logLarvaError({
+        surface: "labs-queue",
+        errorType: "model_error",
+        wallet: item.wallet,
+        message: errMsg(e),
+        context: { queueItemId: item.id, ideaId: item.idea_id },
+      });
       await sql`UPDATE labs_queue SET status = 'failed' WHERE id = ${item.id}`;
     }
   }

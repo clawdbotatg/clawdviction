@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initDb, sql } from "~~/lib/db";
+import { errMsg, logLarvaError } from "~~/lib/larvaErrors";
 import { QueueItem, processQueueItem } from "~~/lib/processQueueItem";
 import { verifyAuth } from "~~/lib/verifyAuth";
 
@@ -37,6 +38,13 @@ export async function POST(request: NextRequest) {
         results.push(result.value);
       } else {
         console.error(`Queue processing error for item ${item.id}:`, result.reason);
+        await logLarvaError({
+          surface: "gov-queue",
+          errorType: "model_error",
+          wallet: item.wallet,
+          message: errMsg(result.reason),
+          context: { queueItemId: item.id, proposalId: item.proposal_id, type: item.type },
+        });
         await sql`UPDATE governance_queue SET status = 'failed' WHERE id = ${item.id}`;
       }
     }
@@ -44,6 +52,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ processed: results.length, results });
   } catch (error) {
     console.error("POST /api/gov/queue/process error:", error);
+    await logLarvaError({ surface: "gov-queue", errorType: "internal", statusCode: 500, message: errMsg(error) });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }

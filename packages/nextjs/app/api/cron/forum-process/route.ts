@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { initDb, sql } from "~~/lib/db";
 import { aggregateForumPost } from "~~/lib/forumAggregate";
 import { processForumQueue } from "~~/lib/forumQueue";
+import { errMsg, logLarvaError } from "~~/lib/larvaErrors";
 
 export const maxDuration = 120;
 
@@ -44,12 +45,25 @@ export async function GET(request: NextRequest) {
         console.log(`Auto-aggregated forum post ${row.id}`);
       } catch (e) {
         console.error(`Auto-aggregate failed for forum post ${row.id}:`, e);
+        await logLarvaError({
+          surface: "forum-agg",
+          errorType: "model_error",
+          message: errMsg(e),
+          context: { postId: row.id, cron: true },
+        });
       }
     }
 
     return NextResponse.json({ processed, aggregated });
   } catch (error) {
     console.error("Cron forum-process error:", error);
+    await logLarvaError({
+      surface: "forum-queue",
+      errorType: "internal",
+      statusCode: 500,
+      message: errMsg(error),
+      context: { cron: true },
+    });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }

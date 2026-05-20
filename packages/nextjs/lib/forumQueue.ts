@@ -1,6 +1,7 @@
 import { compressMemory, initDb, sql } from "~~/lib/db";
 import { aggregateForumPost } from "~~/lib/forumAggregate";
 import { runLarvaConversation } from "~~/lib/larvaAi";
+import { errMsg, logLarvaError } from "~~/lib/larvaErrors";
 import { formatAnswersAsQA } from "~~/lib/questions";
 
 function buildForumSystemPrompt(
@@ -173,12 +174,25 @@ export async function processForumQueue(
           await aggregateForumPost(item.post_id);
         } catch (e) {
           console.error(`Auto-aggregate failed for post ${item.post_id}:`, e);
+          await logLarvaError({
+            surface: "forum-agg",
+            errorType: "model_error",
+            message: errMsg(e),
+            context: { postId: item.post_id, autoTriggered: true },
+          });
         }
       }
 
       results.push({ wallet: item.wallet, response: text });
     } catch (e) {
       console.error(`Forum queue processing error for item ${item.id}:`, e);
+      await logLarvaError({
+        surface: "forum-queue",
+        errorType: "model_error",
+        wallet: item.wallet,
+        message: errMsg(e),
+        context: { queueItemId: item.id, postId: item.post_id },
+      });
       await sql`UPDATE forum_queue SET status = 'failed' WHERE id = ${item.id}`;
     }
   }

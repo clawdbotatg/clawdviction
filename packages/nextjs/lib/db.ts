@@ -150,6 +150,24 @@ export async function initDb() {
   await sql`ALTER TABLE labs_ideas ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT false`;
   await sql`ALTER TABLE labs_ideas ADD COLUMN IF NOT EXISTS archived_by TEXT`;
 
+  // Centralized failure log for every AI surface — chat, greet, queue processors,
+  // aggregators, memory compression. Lets the admin page surface failures that
+  // otherwise leave no trace (auth/CV/rate rejections never hit chat_messages).
+  await sql`
+    CREATE TABLE IF NOT EXISTS larva_errors (
+      id SERIAL PRIMARY KEY,
+      surface TEXT NOT NULL,
+      error_type TEXT NOT NULL,
+      wallet TEXT,
+      status_code INTEGER,
+      message TEXT,
+      context JSONB,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_larva_errors_created ON larva_errors(created_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_larva_errors_surface ON larva_errors(surface, created_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_larva_errors_wallet ON larva_errors(wallet, created_at DESC) WHERE wallet IS NOT NULL`;
+
   dbInitialized = true;
 }
 
