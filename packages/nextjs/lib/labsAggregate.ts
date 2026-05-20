@@ -2,8 +2,8 @@ import { initDb, sql } from "~~/lib/db";
 import { runLarvaConversation } from "~~/lib/larvaAi";
 
 export async function aggregateLabsIdea(ideaId: number): Promise<{ opinion: string; opinionShort: string | null }> {
-  if (!process.env.VENICE_API_KEY && !process.env.ANTHROPIC_API_KEY) {
-    throw new Error("No model API key configured (VENICE_API_KEY or ANTHROPIC_API_KEY)");
+  if (!process.env.VENICE_API_KEY) {
+    throw new Error("No VENICE_API_KEY configured");
   }
 
   await initDb();

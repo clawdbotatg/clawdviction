@@ -46,15 +46,15 @@ Holder wallet: ${wallet}`;
 }
 
 /**
- * Process up to `limit` pending forum_queue items via Anthropic Haiku.
+ * Process up to `limit` pending forum_queue items via Venice kimi-k2-6.
  * Returns the number processed and result details.
  * Caller is responsible for calling initDb() before this if needed.
  */
 export async function processForumQueue(
   limit = 10,
 ): Promise<{ processed: number; results: { wallet: string; response: string }[] }> {
-  if (!process.env.VENICE_API_KEY && !process.env.ANTHROPIC_API_KEY) {
-    throw new Error("No model API key configured (VENICE_API_KEY or ANTHROPIC_API_KEY)");
+  if (!process.env.VENICE_API_KEY) {
+    throw new Error("No VENICE_API_KEY configured");
   }
 
   await initDb();

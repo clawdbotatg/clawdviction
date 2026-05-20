@@ -48,8 +48,8 @@ Holder wallet: ${wallet}`;
 export async function processLabsQueue(
   limit = 10,
 ): Promise<{ processed: number; results: { wallet: string; response: string }[] }> {
-  if (!process.env.VENICE_API_KEY && !process.env.ANTHROPIC_API_KEY) {
-    throw new Error("No model API key configured (VENICE_API_KEY or ANTHROPIC_API_KEY)");
+  if (!process.env.VENICE_API_KEY) {
+    throw new Error("No VENICE_API_KEY configured");
   }
 
   await initDb();

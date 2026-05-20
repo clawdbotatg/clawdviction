@@ -410,8 +410,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Rate limited — max 10 messages per minute. Slow down! 🦞" }, { status: 429 });
     }
 
-    if (!process.env.VENICE_API_KEY && !process.env.ANTHROPIC_API_KEY) {
-      await logLarvaError({ surface: "chat", errorType: "config", wallet, statusCode: 500, message: "no API keys" });
+    if (!process.env.VENICE_API_KEY) {
+      await logLarvaError({
+        surface: "chat",
+        errorType: "config",
+        wallet,
+        statusCode: 500,
+        message: "no VENICE_API_KEY",
+      });
       return NextResponse.json({ error: "API key not configured" }, { status: 500 });
     }
 

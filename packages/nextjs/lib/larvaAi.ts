@@ -1,12 +1,9 @@
-// Larva model wrapper.
-// Primary: Venice (kimi-k2-6, OpenAI-compatible /chat/completions).
-// Fallback: Anthropic Haiku (content-block tool use).
-// Both paths share a single tool surface defined by LarvaTool.
+// Larva model wrapper — Venice kimi-k2-6 (OpenAI-compatible /chat/completions),
+// tool-use loop included. Anthropic was removed 2026-05-20; all larva inference
+// flows through Venice now.
 
 const VENICE_BASE = process.env.VENICE_BASE_URL || "https://api.venice.ai/api/v1";
 const VENICE_MODEL = "kimi-k2-6";
-const ANTHROPIC_MODEL = "claude-haiku-4-5";
-const ANTHROPIC_VERSION = "2023-06-01";
 
 export type LarvaTool = {
   name: string;
@@ -31,35 +28,23 @@ export type LarvaRunOptions = {
 
 export type LarvaRunResult = {
   text: string;
-  provider: "venice" | "anthropic";
+  provider: "venice";
 };
 
 export async function runLarvaConversation(opts: LarvaRunOptions): Promise<LarvaRunResult> {
-  // Use console.warn for the success line so it reliably surfaces in Vercel's
-  // indexed runtime logs (info-level console.log was getting dropped from
-  // searchable history).
+  // Warn-level so the line surfaces in Vercel's indexed runtime logs.
   console.warn("[larvaAi] runLarvaConversation called", {
     veniceKey: !!process.env.VENICE_API_KEY,
-    anthropicKey: !!process.env.ANTHROPIC_API_KEY,
     hasTools: !!opts.tools?.length,
   });
 
-  if (process.env.VENICE_API_KEY) {
-    try {
-      const text = await runVenice(opts);
-      if (text && text.trim()) {
-        console.warn("[larvaAi] provider=venice");
-        return { text, provider: "venice" };
-      }
-      console.warn("[larvaAi] Venice returned empty content — falling back to Anthropic");
-    } catch (e) {
-      console.warn("[larvaAi] Venice failed — falling back to Anthropic:", e instanceof Error ? e.message : e);
-    }
+  if (!process.env.VENICE_API_KEY) {
+    throw new Error("VENICE_API_KEY not set");
   }
 
-  const text = await runAnthropic(opts);
-  console.warn("[larvaAi] provider=anthropic");
-  return { text, provider: "anthropic" };
+  const text = await runVenice(opts);
+  console.warn("[larvaAi] provider=venice");
+  return { text, provider: "venice" };
 }
 
 /* ---------- Venice (OpenAI-compatible) ---------- */
@@ -145,82 +130,6 @@ async function runVenice(opts: LarvaRunOptions): Promise<string> {
     }
 
     return typeof msg.content === "string" ? msg.content : "";
-  }
-  return "";
-}
-
-/* ---------- Anthropic (content blocks) ---------- */
-
-type AnthropicTextBlock = { type: "text"; text: string };
-type AnthropicToolUseBlock = { type: "tool_use"; id: string; name: string; input: Record<string, unknown> };
-type AnthropicToolResultBlock = { type: "tool_result"; tool_use_id: string; content: string };
-type AnthropicBlock = AnthropicTextBlock | AnthropicToolUseBlock | AnthropicToolResultBlock;
-type AnthropicMessage = { role: "user" | "assistant"; content: string | AnthropicBlock[] };
-
-async function runAnthropic(opts: LarvaRunOptions): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
-
-  const maxRounds = opts.maxToolRounds ?? 3;
-  const maxTokens = opts.maxTokens ?? 2000;
-  const maxToolResult = opts.maxToolResultLength ?? 3000;
-  const timeoutMs = opts.timeoutMs ?? 25000;
-
-  const tools = opts.tools?.map(t => ({
-    name: t.name,
-    description: t.description,
-    input_schema: t.parameters,
-  }));
-  const toolMap = new Map(opts.tools?.map(t => [t.name, t]) ?? []);
-
-  const messages: AnthropicMessage[] = opts.messages.map(m => ({ role: m.role, content: m.content }));
-
-  for (let round = 0; round < maxRounds; round++) {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": ANTHROPIC_VERSION,
-      },
-      body: JSON.stringify({
-        model: ANTHROPIC_MODEL,
-        max_tokens: maxTokens,
-        ...(opts.system ? { system: opts.system } : {}),
-        messages,
-        ...(tools ? { tools } : {}),
-      }),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Anthropic HTTP ${res.status}: ${body.slice(0, 300)}`);
-    }
-    const data = await res.json();
-    const stop: string | undefined = data.stop_reason;
-    const content: AnthropicBlock[] | undefined = data.content;
-
-    if (stop === "tool_use" && content) {
-      messages.push({ role: "assistant", content });
-      const toolResults: AnthropicToolResultBlock[] = [];
-      for (const block of content) {
-        if (block.type !== "tool_use") continue;
-        const tool = toolMap.get(block.name);
-        let result: string;
-        if (!tool) {
-          result = JSON.stringify({ error: `unknown tool ${block.name}` });
-        } else {
-          result = await tool.execute(block.input || {});
-        }
-        if (result.length > maxToolResult) result = result.slice(0, maxToolResult) + "… [truncated]";
-        toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
-      }
-      messages.push({ role: "user", content: toolResults });
-      continue;
-    }
-
-    return content?.find((b): b is AnthropicTextBlock => b.type === "text")?.text ?? "";
   }
   return "";
 }

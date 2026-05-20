@@ -90,8 +90,8 @@ export async function processQueueItem(item: QueueItem): Promise<{ wallet: strin
     userMessage = `GOVERNANCE RFC: "${item.title}"\n\nQuestion: ${item.question}\n\nBased on everything you know about this holder's values and preferences, provide a thoughtful comment representing their perspective. Keep it to 2-4 sentences.`;
   }
 
-  if (!process.env.VENICE_API_KEY && !process.env.ANTHROPIC_API_KEY) {
-    throw new Error("No model API key configured (VENICE_API_KEY or ANTHROPIC_API_KEY)");
+  if (!process.env.VENICE_API_KEY) {
+    throw new Error("No VENICE_API_KEY configured");
   }
 
   const result = await runLarvaConversation({
