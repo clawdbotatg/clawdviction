@@ -11,6 +11,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
     const postResult = await sql`
       SELECT id, wallet, title, body, cv_burned::int as cv_burned,
+             total_cv::int as total_cv,
              larva_triggered, aggregated_opinion, aggregated_opinion_short, created_at
       FROM forum_posts WHERE id = ${id}`;
     if (postResult.rows.length === 0) {
@@ -21,6 +22,11 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       SELECT id, wallet, body, cv_burned::int as cv_burned, created_at
       FROM forum_replies WHERE post_id = ${id}
       ORDER BY created_at ASC`;
+
+    const stakes = await sql`
+      SELECT wallet, cv_amount::int as cv_amount, created_at
+      FROM forum_stakes WHERE post_id = ${id}
+      ORDER BY created_at DESC`;
 
     const larvaCount = await sql`
       SELECT COUNT(*)::int as count FROM forum_responses WHERE post_id = ${id}`;
@@ -41,6 +47,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({
       post: postResult.rows[0],
       replies: replies.rows,
+      stakes: stakes.rows,
       larvaResponseCount: larvaCount.rows[0].count,
       larvaPendingCount: pendingCount.rows[0].count,
       larvaResponses,

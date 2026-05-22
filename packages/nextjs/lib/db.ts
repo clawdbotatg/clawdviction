@@ -152,6 +152,18 @@ export async function initDb() {
 
   await sql`ALTER TABLE forum_posts ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT false`;
   await sql`ALTER TABLE forum_posts ADD COLUMN IF NOT EXISTS archived_by TEXT`;
+  await sql`ALTER TABLE forum_posts ADD COLUMN IF NOT EXISTS total_cv BIGINT NOT NULL DEFAULT 0`;
+  // Backfill total_cv from cv_burned for posts created before staking existed
+  await sql`UPDATE forum_posts SET total_cv = cv_burned WHERE total_cv = 0 AND cv_burned > 0`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS forum_stakes (
+      id SERIAL PRIMARY KEY,
+      wallet TEXT NOT NULL,
+      post_id INTEGER NOT NULL REFERENCES forum_posts(id) ON DELETE CASCADE,
+      cv_amount BIGINT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )`;
 
   // Centralized failure log for every AI surface — chat, greet, queue processors,
   // aggregators, memory compression. Lets the admin page surface failures that

@@ -10,14 +10,16 @@ export async function GET() {
     await initDb();
     const result = await sql`
       SELECT p.id, p.wallet, p.title, p.body, p.cv_burned::int as cv_burned,
+             p.total_cv::int as total_cv,
              p.larva_triggered, p.aggregated_opinion_short, p.created_at,
              COALESCE(p.archived, false) as archived, p.archived_by,
-             COUNT(r.id)::int as reply_count,
-             p.cv_burned / pow(extract(epoch from (NOW() - p.created_at))/3600 + 2, 1.5) as score
+             COUNT(DISTINCT r.id)::int as reply_count,
+             COUNT(DISTINCT s.id)::int as stake_count
       FROM forum_posts p
       LEFT JOIN forum_replies r ON r.post_id = p.id
+      LEFT JOIN forum_stakes s ON s.post_id = p.id
       GROUP BY p.id
-      ORDER BY COALESCE(p.archived, false) ASC, score DESC`;
+      ORDER BY COALESCE(p.archived, false) ASC, p.total_cv DESC`;
     return NextResponse.json(result.rows);
   } catch (error) {
     console.error("GET /api/forum error:", error);
@@ -55,8 +57,8 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await sql`
-      INSERT INTO forum_posts (wallet, title, body, cv_burned)
-      VALUES (${wallet}, ${title}, ${body}, ${FORUM_POST_COST})
+      INSERT INTO forum_posts (wallet, title, body, cv_burned, total_cv)
+      VALUES (${wallet}, ${title}, ${body}, ${FORUM_POST_COST}, ${FORUM_POST_COST})
       RETURNING *`;
 
     return NextResponse.json(result.rows[0]);

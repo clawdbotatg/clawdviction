@@ -7,6 +7,8 @@ import { Address, RainbowKitCustomConnectButton } from "~~/components/scaffold-e
 import { useAuth } from "~~/hooks/useAuth";
 import { authFetch } from "~~/lib/authFetch";
 
+const FORUM_STAKE_MIN = 100_000;
+
 interface PostData {
   post: {
     id: number;
@@ -14,6 +16,7 @@ interface PostData {
     title: string;
     body: string;
     cv_burned: number;
+    total_cv: number;
     larva_triggered: boolean;
     aggregated_opinion: string | null;
     aggregated_opinion_short: string | null;
@@ -24,6 +27,11 @@ interface PostData {
     wallet: string;
     body: string;
     cv_burned: number;
+    created_at: string;
+  }[];
+  stakes: {
+    wallet: string;
+    cv_amount: number;
     created_at: string;
   }[];
   larvaResponseCount: number;
@@ -53,7 +61,25 @@ export default function ForumPostPage({ params }: { params: Promise<{ id: string
   const [replyBody, setReplyBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [triggering, setTriggering] = useState(false);
+  const [stakeAmount, setStakeAmount] = useState("");
+  const [staking, setStaking] = useState(false);
+  const [balance, setBalance] = useState<number | null>(null);
   const [error, setError] = useState("");
+
+  const fetchBalance = () => {
+    if (!address) return;
+    fetch(`/api/clawdviction/${address.toLowerCase()}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.balance !== undefined) setBalance(parseFloat(d.balance));
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchBalance();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address]);
 
   const fetchPost = () => {
     fetch(`/api/forum/${id}`)
@@ -91,6 +117,32 @@ export default function ForumPostPage({ params }: { params: Promise<{ id: string
       setError("Failed to reply");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleStake = async () => {
+    if (!authData) return;
+    const amount = parseInt(stakeAmount);
+    if (isNaN(amount) || amount < FORUM_STAKE_MIN) return;
+    setStaking(true);
+    setError("");
+    try {
+      const res = await authFetch(`/api/forum/${id}/stake`, authData, {
+        method: "POST",
+        body: JSON.stringify({ cv_amount: amount }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        setError(result.error || "Failed to stake");
+      } else {
+        setStakeAmount("");
+        fetchPost();
+        fetchBalance();
+      }
+    } catch {
+      setError("Failed to stake");
+    } finally {
+      setStaking(false);
     }
   };
 
@@ -132,7 +184,7 @@ export default function ForumPostPage({ params }: { params: Promise<{ id: string
     );
   }
 
-  const { post, replies, larvaResponseCount, larvaPendingCount, larvaResponses } = data;
+  const { post, replies, stakes, larvaResponseCount, larvaPendingCount, larvaResponses } = data;
 
   return (
     <div className="flex flex-col items-center min-h-screen pt-10 px-4">
@@ -145,7 +197,7 @@ export default function ForumPostPage({ params }: { params: Promise<{ id: string
         <div className="card rounded-none bg-base-200 shadow-md mb-6">
           <div className="card-body">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <span className="badge badge-sm badge-accent">{post.cv_burned.toLocaleString()} CV burned</span>
+              <span className="badge badge-accent font-bold">{post.total_cv.toLocaleString()} CV total</span>
               <span className="text-xs text-base-content/50">{timeAgo(post.created_at)}</span>
               <span className="text-xs text-base-content/50 inline-flex items-center gap-1">
                 by <Address address={post.wallet} size="xs" />
@@ -153,7 +205,74 @@ export default function ForumPostPage({ params }: { params: Promise<{ id: string
             </div>
             <h1 className="text-2xl font-bold">{post.title}</h1>
             <p className="mt-3 whitespace-pre-wrap">{post.body}</p>
+            <p className="text-xs text-base-content/50 mt-2">Initial burn: {post.cv_burned.toLocaleString()} CV</p>
           </div>
+        </div>
+
+        {/* Stake CV Form */}
+        <div className="card rounded-none bg-base-200 shadow-md mb-6">
+          <div className="card-body">
+            <h3 className="font-bold">🔥 Stake CV on this post</h3>
+            {!address ? (
+              <div className="mt-2">
+                <RainbowKitCustomConnectButton />
+              </div>
+            ) : !isAuthenticated ? (
+              <button className="btn btn-outline btn-sm mt-2" onClick={signIn} disabled={signing}>
+                {signing ? "Signing..." : "Sign in to stake"}
+              </button>
+            ) : (
+              <div className="mt-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    className="input input-bordered rounded-none w-48"
+                    placeholder="CV amount"
+                    min={FORUM_STAKE_MIN}
+                    step={100000}
+                    value={stakeAmount}
+                    onChange={e => setStakeAmount(e.target.value)}
+                  />
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={handleStake}
+                    disabled={staking || !stakeAmount || parseInt(stakeAmount) < FORUM_STAKE_MIN}
+                  >
+                    {staking ? <span className="loading loading-spinner loading-xs"></span> : "Stake"}
+                  </button>
+                </div>
+                <div className="text-xs text-base-content/50 mt-1">
+                  Min: {FORUM_STAKE_MIN.toLocaleString()} CV
+                  {balance !== null && <span> · Balance: {Math.floor(balance).toLocaleString()} CV</span>}
+                </div>
+              </div>
+            )}
+            {error && <p className="text-error text-sm mt-2">{error}</p>}
+          </div>
+        </div>
+
+        {/* Stakes List */}
+        <div className="mb-6">
+          <h2 className="text-lg font-bold mb-4">🔥 Stakes ({stakes.length})</h2>
+          {stakes.length === 0 ? (
+            <p className="text-sm text-base-content/60">No stakes yet. Be the first to back this post!</p>
+          ) : (
+            <div className="space-y-3">
+              {stakes.map((s, i) => (
+                <div key={i} className="card rounded-none bg-base-200">
+                  <div className="card-body py-3 px-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Address address={s.wallet} size="xs" />
+                        <span className="text-xs text-base-content/50">· {timeAgo(s.created_at)}</span>
+                      </div>
+                      <span className="badge badge-accent badge-sm font-bold">{s.cv_amount.toLocaleString()} CV</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Replies */}
