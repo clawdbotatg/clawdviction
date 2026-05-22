@@ -150,6 +150,9 @@ export async function initDb() {
   await sql`ALTER TABLE labs_ideas ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT false`;
   await sql`ALTER TABLE labs_ideas ADD COLUMN IF NOT EXISTS archived_by TEXT`;
 
+  await sql`ALTER TABLE forum_posts ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT false`;
+  await sql`ALTER TABLE forum_posts ADD COLUMN IF NOT EXISTS archived_by TEXT`;
+
   // Centralized failure log for every AI surface — chat, greet, queue processors,
   // aggregators, memory compression. Lets the admin page surface failures that
   // otherwise leave no trace (auth/CV/rate rejections never hit chat_messages).
