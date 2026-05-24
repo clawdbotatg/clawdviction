@@ -12,11 +12,12 @@ export async function GET() {
       SELECT i.id, i.wallet, i.title, i.description, i.cv_burned::int as cv_burned,
              i.total_cv::int as total_cv, i.status, i.created_at,
              COALESCE(i.archived, false) as archived, i.archived_by,
-             COUNT(s.id)::int as stake_count
+             COUNT(s.id)::int as stake_count,
+             i.total_cv / pow(extract(epoch from (NOW() - i.created_at))/3600 + 2, 1.5) as score
       FROM labs_ideas i
       LEFT JOIN labs_stakes s ON s.idea_id = i.id
       GROUP BY i.id
-      ORDER BY COALESCE(i.archived, false) ASC, i.total_cv DESC`;
+      ORDER BY COALESCE(i.archived, false) ASC, score DESC`;
     return NextResponse.json(result.rows);
   } catch (error) {
     console.error("GET /api/labs error:", error);

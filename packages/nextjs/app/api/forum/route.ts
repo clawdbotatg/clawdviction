@@ -14,12 +14,13 @@ export async function GET() {
              p.larva_triggered, p.aggregated_opinion_short, p.created_at,
              COALESCE(p.archived, false) as archived, p.archived_by,
              COUNT(DISTINCT r.id)::int as reply_count,
-             COUNT(DISTINCT s.id)::int as stake_count
+             COUNT(DISTINCT s.id)::int as stake_count,
+             p.total_cv / pow(extract(epoch from (NOW() - p.created_at))/3600 + 2, 1.5) as score
       FROM forum_posts p
       LEFT JOIN forum_replies r ON r.post_id = p.id
       LEFT JOIN forum_stakes s ON s.post_id = p.id
       GROUP BY p.id
-      ORDER BY COALESCE(p.archived, false) ASC, p.total_cv DESC`;
+      ORDER BY COALESCE(p.archived, false) ASC, score DESC`;
     return NextResponse.json(result.rows);
   } catch (error) {
     console.error("GET /api/forum error:", error);
