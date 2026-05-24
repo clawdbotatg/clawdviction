@@ -21,6 +21,7 @@ interface ForumPost {
   created_at: string;
   reply_count: number;
   stake_count: number;
+  score: number;
   archived: boolean;
   archived_by: string | null;
 }
@@ -131,6 +132,12 @@ const ForumPage: NextPage = () => {
                         {p.larva_triggered && <span className="badge badge-sm badge-info">🧠 Hive-Mind</span>}
                         {p.archived && <span className="badge badge-sm badge-ghost">📦 Archived</span>}
                         <span className="text-xs text-base-content/50">{timeAgo(p.created_at)}</span>
+                        <span
+                          className="text-xs font-mono text-base-content/40"
+                          title="Sort score: total_cv / (age_hours + 2)^0.7"
+                        >
+                          score {Math.round(Number(p.score)).toLocaleString()}
+                        </span>
                       </div>
                       <h2 className="text-lg font-semibold">{p.title}</h2>
                       <p className="text-sm text-base-content/60 mt-1 flex items-center gap-1">
