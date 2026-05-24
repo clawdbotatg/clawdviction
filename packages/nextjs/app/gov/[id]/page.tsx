@@ -560,6 +560,61 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
             );
           })()}
 
+        {/* Aggregated opinion — visible to everyone if it exists, admin can generate */}
+        {(proposal.aggregated_opinion || (isAdmin && isAuthenticated && responseCount > 0)) && (
+          <div className="card rounded-none bg-base-200 shadow-md mb-6">
+            <div className="card-body">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold">
+                  {proposal.type === "vote" ? "⚖️ Ruling" : "🧠 Aggregated Opinion"}
+                </h2>
+                {isAdmin && isAuthenticated && (
+                  <button
+                    className="btn btn-sm btn-outline rounded-none"
+                    disabled={aggregateLoading}
+                    onClick={async () => {
+                      if (!authData) return;
+                      setAggregateLoading(true);
+                      try {
+                        await authFetch(`/api/gov/${params.id}/aggregate`, authData, { method: "POST" });
+                        await fetchData();
+                      } catch {
+                        /* ignore */
+                      }
+                      setAggregateLoading(false);
+                    }}
+                  >
+                    {aggregateLoading ? (
+                      <>
+                        <span className="loading loading-spinner loading-sm" />
+                        Synthesizing...
+                      </>
+                    ) : proposal.aggregated_opinion ? (
+                      "↺ Regenerate"
+                    ) : (
+                      "✨ Form Aggregated Opinion"
+                    )}
+                  </button>
+                )}
+              </div>
+              {proposal.aggregated_opinion ? (
+                <>
+                  <p className="whitespace-pre-wrap text-base-content">{proposal.aggregated_opinion}</p>
+                  {proposal.aggregated_opinion_short && (
+                    <div className="mt-4 pt-4 border-t border-base-content/10">
+                      <p className="text-lg font-semibold text-error">{proposal.aggregated_opinion_short}</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-base-content/50 text-sm">
+                  No ruling yet. Hit the button to synthesize all responses.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Admin: All Responses Table */}
         {isAdmin && isAuthenticated && responses && responses.length > 0 && (
           <div className="card rounded-none bg-base-200 shadow-md mb-6">
@@ -613,61 +668,6 @@ export default function ProposalDetailPage({ params: paramsPromise }: { params: 
                   </tbody>
                 </table>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Aggregated opinion — visible to everyone if it exists, admin can generate */}
-        {(proposal.aggregated_opinion || (isAdmin && isAuthenticated && responseCount > 0)) && (
-          <div className="card rounded-none bg-base-200 shadow-md mb-6">
-            <div className="card-body">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-semibold">
-                  {proposal.type === "vote" ? "⚖️ Ruling" : "🧠 Aggregated Opinion"}
-                </h2>
-                {isAdmin && isAuthenticated && (
-                  <button
-                    className="btn btn-sm btn-outline rounded-none"
-                    disabled={aggregateLoading}
-                    onClick={async () => {
-                      if (!authData) return;
-                      setAggregateLoading(true);
-                      try {
-                        await authFetch(`/api/gov/${params.id}/aggregate`, authData, { method: "POST" });
-                        await fetchData();
-                      } catch {
-                        /* ignore */
-                      }
-                      setAggregateLoading(false);
-                    }}
-                  >
-                    {aggregateLoading ? (
-                      <>
-                        <span className="loading loading-spinner loading-sm" />
-                        Synthesizing...
-                      </>
-                    ) : proposal.aggregated_opinion ? (
-                      "↺ Regenerate"
-                    ) : (
-                      "✨ Form Aggregated Opinion"
-                    )}
-                  </button>
-                )}
-              </div>
-              {proposal.aggregated_opinion ? (
-                <>
-                  <p className="whitespace-pre-wrap text-base-content">{proposal.aggregated_opinion}</p>
-                  {proposal.aggregated_opinion_short && (
-                    <div className="mt-4 pt-4 border-t border-base-content/10">
-                      <p className="text-lg font-semibold text-error">{proposal.aggregated_opinion_short}</p>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <p className="text-base-content/50 text-sm">
-                  No ruling yet. Hit the button to synthesize all responses.
-                </p>
-              )}
             </div>
           </div>
         )}
