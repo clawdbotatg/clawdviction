@@ -8,8 +8,6 @@ import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useAuth } from "~~/hooks/useAuth";
 import { authFetch } from "~~/lib/authFetch";
 
-const LABS_SUBMIT_COST = 1_000_000;
-
 export default function LabsSubmitPage() {
   const router = useRouter();
   const { address } = useAccount();
@@ -18,6 +16,7 @@ export default function LabsSubmitPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [balance, setBalance] = useState<number | null>(null);
+  const [postCost, setPostCost] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -31,7 +30,16 @@ export default function LabsSubmitPage() {
       .catch(() => {});
   }, [address]);
 
-  const canPost = balance !== null && balance >= LABS_SUBMIT_COST;
+  useEffect(() => {
+    fetch("/api/post-costs")
+      .then(r => r.json())
+      .then(d => {
+        if (typeof d.labs === "number") setPostCost(d.labs);
+      })
+      .catch(() => {});
+  }, []);
+
+  const canPost = balance !== null && postCost !== null && balance >= postCost;
 
   const handleSubmit = async () => {
     if (!authData || !title.trim() || !description.trim()) return;
@@ -115,7 +123,9 @@ export default function LabsSubmitPage() {
 
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="text-sm">
-                  <span className="text-warning font-semibold">Costs 1M CV</span>
+                  <span className="text-warning font-semibold">
+                    {postCost !== null ? `Costs ${postCost.toLocaleString()} CV` : "Loading cost…"}
+                  </span>
                   {balance !== null && (
                     <span className="text-base-content/50 ml-2">
                       (Balance: {Math.floor(balance).toLocaleString()} CV)

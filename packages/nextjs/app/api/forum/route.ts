@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CvError, deductCV } from "~~/lib/cvSpend";
 import { initDb, sql } from "~~/lib/db";
+import { getPostCosts } from "~~/lib/postCost";
 import { verifyAuth } from "~~/lib/verifyAuth";
-
-const FORUM_POST_COST = 500_000;
 
 export async function GET() {
   try {
@@ -48,8 +47,10 @@ export async function POST(request: NextRequest) {
 
     await initDb();
 
+    const { forum: cost } = await getPostCosts();
+
     try {
-      await deductCV(wallet, FORUM_POST_COST);
+      await deductCV(wallet, cost);
     } catch (e) {
       if (e instanceof CvError) {
         return NextResponse.json({ error: e.message }, { status: e.status });
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
 
     const result = await sql`
       INSERT INTO forum_posts (wallet, title, body, cv_burned, total_cv)
-      VALUES (${wallet}, ${title}, ${body}, ${FORUM_POST_COST}, ${FORUM_POST_COST})
+      VALUES (${wallet}, ${title}, ${body}, ${cost}, ${cost})
       RETURNING *`;
 
     return NextResponse.json(result.rows[0]);

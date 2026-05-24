@@ -8,8 +8,6 @@ import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useAuth } from "~~/hooks/useAuth";
 import { authFetch } from "~~/lib/authFetch";
 
-const FORUM_POST_COST = 500_000;
-
 export default function ForumSubmitPage() {
   const router = useRouter();
   const { address } = useAccount();
@@ -18,6 +16,7 @@ export default function ForumSubmitPage() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [balance, setBalance] = useState<number | null>(null);
+  const [postCost, setPostCost] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -31,7 +30,16 @@ export default function ForumSubmitPage() {
       .catch(() => {});
   }, [address]);
 
-  const canPost = balance !== null && balance >= FORUM_POST_COST;
+  useEffect(() => {
+    fetch("/api/post-costs")
+      .then(r => r.json())
+      .then(d => {
+        if (typeof d.forum === "number") setPostCost(d.forum);
+      })
+      .catch(() => {});
+  }, []);
+
+  const canPost = balance !== null && postCost !== null && balance >= postCost;
 
   const handleSubmit = async () => {
     if (!authData || !title.trim() || !body.trim()) return;
@@ -115,7 +123,9 @@ export default function ForumSubmitPage() {
 
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="text-sm">
-                  <span className="text-warning font-semibold">Costs 500k CV</span>
+                  <span className="text-warning font-semibold">
+                    {postCost !== null ? `Costs ${postCost.toLocaleString()} CV` : "Loading cost…"}
+                  </span>
                   {balance !== null && (
                     <span className="text-base-content/50 ml-2">
                       (Balance: {Math.floor(balance).toLocaleString()} CV)

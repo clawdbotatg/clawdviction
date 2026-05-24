@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CvError, deductCV } from "~~/lib/cvSpend";
 import { initDb, sql } from "~~/lib/db";
+import { getPostCosts } from "~~/lib/postCost";
 import { verifyAuth } from "~~/lib/verifyAuth";
-
-const LABS_SUBMIT_COST = 1_000_000;
 
 export async function GET() {
   try {
@@ -45,8 +44,10 @@ export async function POST(request: NextRequest) {
 
     await initDb();
 
+    const { labs: cost } = await getPostCosts();
+
     try {
-      await deductCV(wallet, LABS_SUBMIT_COST);
+      await deductCV(wallet, cost);
     } catch (e) {
       if (e instanceof CvError) {
         return NextResponse.json({ error: e.message }, { status: e.status });
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     const result = await sql`
       INSERT INTO labs_ideas (wallet, title, description, cv_burned, total_cv)
-      VALUES (${wallet}, ${title}, ${description}, ${LABS_SUBMIT_COST}, ${LABS_SUBMIT_COST})
+      VALUES (${wallet}, ${title}, ${description}, ${cost}, ${cost})
       RETURNING *`;
 
     return NextResponse.json(result.rows[0]);
