@@ -4,8 +4,10 @@ import { sql } from "~~/lib/db";
 // (lib/cvSpend, /api/cv/leaderboard, /api/chat). Keep this in sync.
 const DIVISOR = 1728000 * 1e18;
 
-export const FORUM_POST_DIVISOR = 50;
-export const LABS_SUBMIT_DIVISOR = 25;
+// Tuned so forum ≈ 10M and labs ≈ 30M CV at a top balance of ~3.9B.
+// Adjust if the top holder changes by an order of magnitude.
+export const FORUM_POST_DIVISOR = 391;
+export const LABS_SUBMIT_DIVISOR = 130;
 
 export type PostCosts = {
   maxCv: number;
