@@ -183,6 +183,20 @@ export async function initDb() {
   await sql`CREATE INDEX IF NOT EXISTS idx_larva_errors_surface ON larva_errors(surface, created_at DESC)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_larva_errors_wallet ON larva_errors(wallet, created_at DESC) WHERE wallet IS NOT NULL`;
 
+  // Trello-style job board on the labs page. Admin-managed cards that
+  // track real work moving through idea → build → test → shipped.
+  await sql`
+    CREATE TABLE IF NOT EXISTS labs_jobs (
+      id SERIAL PRIMARY KEY,
+      title TEXT NOT NULL,
+      phase TEXT NOT NULL DEFAULT 'idea',
+      archived BOOLEAN NOT NULL DEFAULT false,
+      created_by TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_labs_jobs_phase ON labs_jobs(phase, updated_at DESC)`;
+
   dbInitialized = true;
 }
 

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
+import { LabsJobBoard } from "~~/components/LabsJobBoard";
 import { Address } from "~~/components/scaffold-eth";
 import { useAuth } from "~~/hooks/useAuth";
 import { authFetch } from "~~/lib/authFetch";
@@ -107,6 +108,8 @@ const LabsPage: NextPage = () => {
             </Link>
           )}
         </div>
+
+        <LabsJobBoard />
 
         <p className="text-base-content/60 text-sm mb-4">
           Burn CV to signal conviction on ideas. Highest conviction rises to the top.
