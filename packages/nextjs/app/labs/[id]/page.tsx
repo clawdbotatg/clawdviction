@@ -314,7 +314,9 @@ export default function LabsIdeaPage({ params }: { params: Promise<{ id: string 
               {idea.aggregated_opinion ? (
                 <div className="mt-2">
                   {idea.aggregated_opinion_short && (
-                    <p className="text-sm font-semibold text-info mb-2">{idea.aggregated_opinion_short}</p>
+                    <p className="text-lg font-semibold text-base-content mb-3 leading-snug border-l-2 border-info pl-3">
+                      {idea.aggregated_opinion_short}
+                    </p>
                   )}
                   <p className="whitespace-pre-wrap text-sm">{idea.aggregated_opinion}</p>
                 </div>
