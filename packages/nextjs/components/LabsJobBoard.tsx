@@ -27,8 +27,9 @@ const PHASES: { key: Phase; label: string; emoji: string }[] = [
 
 export const LabsJobBoard = () => {
   const { address } = useAccount();
-  const { authData } = useAuth(address);
+  const { isAuthenticated, authData, signIn, signing } = useAuth(address);
   const isAdmin = isLabsJobsAdmin(address);
+  const canEdit = isAdmin && isAuthenticated;
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
@@ -126,7 +127,14 @@ export const LabsJobBoard = () => {
   return (
     <div className="mb-8">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-xl font-bold">📋 Job Board</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-xl font-bold">📋 Job Board</h2>
+          {isAdmin && !isAuthenticated && (
+            <button className="btn btn-outline btn-xs" onClick={signIn} disabled={signing}>
+              {signing ? "Signing..." : "Sign in (admin)"}
+            </button>
+          )}
+        </div>
         <label className="label cursor-pointer gap-2">
           <span className="label-text text-xs">Show archived</span>
           <input
@@ -154,13 +162,13 @@ export const LabsJobBoard = () => {
                   isDragOver ? "bg-base-300 ring-2 ring-primary" : ""
                 }`}
                 onDragOver={e => {
-                  if (!isAdmin) return;
+                  if (!canEdit) return;
                   e.preventDefault();
                   setDragOverPhase(key);
                 }}
                 onDragLeave={() => setDragOverPhase(null)}
                 onDrop={e => {
-                  if (!isAdmin) return;
+                  if (!canEdit) return;
                   e.preventDefault();
                   const id = parseInt(e.dataTransfer.getData("text/plain"));
                   if (!isNaN(id)) handleDrop(key, id);
@@ -177,13 +185,13 @@ export const LabsJobBoard = () => {
                   {cards.map(job => (
                     <div
                       key={job.id}
-                      draggable={isAdmin && editingId !== job.id}
+                      draggable={canEdit && editingId !== job.id}
                       onDragStart={e => {
                         e.dataTransfer.setData("text/plain", String(job.id));
                         e.dataTransfer.effectAllowed = "move";
                       }}
                       className={`bg-base-100 p-2 shadow-sm group ${
-                        isAdmin ? "cursor-grab active:cursor-grabbing" : ""
+                        canEdit ? "cursor-grab active:cursor-grabbing" : ""
                       } ${job.archived ? "opacity-50" : ""}`}
                     >
                       {editingId === job.id ? (
@@ -212,7 +220,7 @@ export const LabsJobBoard = () => {
                       ) : (
                         <>
                           <p className="text-sm break-words">{job.title}</p>
-                          {isAdmin && (
+                          {canEdit && (
                             <div className="flex gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button
                                 className="btn btn-xs btn-ghost px-1"
@@ -245,7 +253,7 @@ export const LabsJobBoard = () => {
                     </div>
                   ))}
 
-                  {isAdmin && addingTo === key && (
+                  {canEdit && addingTo === key && (
                     <div className="bg-base-100 p-2 shadow-sm">
                       <input
                         type="text"
@@ -285,7 +293,7 @@ export const LabsJobBoard = () => {
                   )}
                 </div>
 
-                {isAdmin && addingTo !== key && (
+                {canEdit && addingTo !== key && (
                   <button
                     className="btn btn-ghost btn-xs w-full mt-2 text-base-content/60 hover:text-base-content"
                     onClick={() => {
