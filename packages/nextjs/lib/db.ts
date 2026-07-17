@@ -197,6 +197,27 @@ export async function initDb() {
     )`;
   await sql`CREATE INDEX IF NOT EXISTS idx_labs_jobs_phase ON labs_jobs(phase, updated_at DESC)`;
 
+  // LARVAE LIVE show state — single row: which idea clawd chose and what
+  // phase the stage is in (debate → building → judgment).
+  await sql`
+    CREATE TABLE IF NOT EXISTS live_show (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      phase TEXT NOT NULL DEFAULT 'debate',
+      chosen_idea_id INTEGER REFERENCES labs_ideas(id),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )`;
+
+  // Room judgment votes — one per wallet per chosen idea (upsert allows changing sides)
+  await sql`
+    CREATE TABLE IF NOT EXISTS live_votes (
+      id SERIAL PRIMARY KEY,
+      idea_id INTEGER NOT NULL REFERENCES labs_ideas(id),
+      wallet TEXT NOT NULL,
+      vote TEXT NOT NULL CHECK (vote IN ('ship', 'slop')),
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(idea_id, wallet)
+    )`;
+
   dbInitialized = true;
 }
 
