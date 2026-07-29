@@ -197,6 +197,30 @@ export async function initDb() {
     )`;
   await sql`CREATE INDEX IF NOT EXISTS idx_labs_jobs_phase ON labs_jobs(phase, updated_at DESC)`;
 
+  // USDC credit ledger (denar.ai prepaid balances) — amounts in integer micro-USDC (6 decimals)
+  await sql`
+    CREATE TABLE IF NOT EXISTS usdc_credits (
+      wallet TEXT PRIMARY KEY,
+      balance_micro NUMERIC NOT NULL DEFAULT 0,
+      total_deposited_micro NUMERIC NOT NULL DEFAULT 0,
+      total_spent_micro NUMERIC NOT NULL DEFAULT 0,
+      auto_topup_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+      auto_topup_amount_micro NUMERIC NOT NULL DEFAULT 0,
+      auto_topup_from TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS usdc_topups (
+      deposit_key TEXT PRIMARY KEY,
+      wallet TEXT NOT NULL,
+      amount_micro NUMERIC NOT NULL,
+      source TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_usdc_topups_wallet ON usdc_topups(wallet, created_at)`;
+
   dbInitialized = true;
 }
 
